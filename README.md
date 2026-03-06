@@ -2,7 +2,7 @@
 
 ![Arbos](arbos.jpg)
 
-All you need is a Ralph loop and a Telegram bot.
+Welcome! Arbos is simply a Ralph-loop—see [ghuntley.com/loop](https://ghuntley.com/loop/)—combined with a Telegram bot. That's all you need to do just about anything.
 
 ## Getting started
 
