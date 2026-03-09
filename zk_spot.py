@@ -36,7 +36,7 @@ class ZKSPoTVerifier:
         Proof contains: { 'commitment': str, 'sparse_bits': List, 'sparse_indices': List, 'sparse_scales': List, 'data_shard': Tuple }
         Public Inputs: { 'initial_weights': List, 'data_hash': str, 'h_steps': int, 'lr': float, 'seed': int }
         """
-        start_time = time.time()
+        start_time = time.perf_counter()
         # 1. Verify Data Commitment (Privacy: Aggregator doesn't see the raw data)
         if proof['commitment'] != public_inputs['data_hash']:
             print(f"ZK-SPoT Fail: Data commitment mismatch")
@@ -101,8 +101,9 @@ class ZKSPoTVerifier:
                 print(f"ZK-SPoT Fail: Scale mismatch for layer {i}. Mu diff: {mu_diff:.4f}, Std diff: {std_diff:.4f}")
                 return False
         
-        end_time = time.time()
-        print(f"[ZK-SPoT Audit] Verification successful in {end_time - start_time:.4f}s")
+        end_time = time.perf_counter()
+        duration = end_time - start_time
+        print(f"[ZK-SPoT Audit] Verification successful in {duration:.6f}s")
         return True
 
 class PrivacyAwareWorker:

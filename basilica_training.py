@@ -273,6 +273,7 @@ class HeterogeneousSparseLoCo:
         # This prevents local sharpness optimization from drifting too far from the global consensus.
         rho = self.sam_rho
         if use_fedsam:
+            # We use an anchored version where drift is measured from initial_weights (global consensus)
             drift_norm = torch.sqrt(sum([(p.data - self.initial_weights[i]).norm()**2 for i, p in enumerate(self.params)]))
             # Scale rho: larger drift -> smaller rho to anchor the update
             rho = rho / (1.0 + drift_norm)
