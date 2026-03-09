@@ -1,7 +1,12 @@
 {
   "Quentin": {
     "delay": 300,
-    "last_run": 1773067485.465942,
+    "last_run": 1773067998.4212868,
+    "failures": 0
+  },
+  "quant": {
+    "delay": 600,
+    "last_run": 1773068282.720331,
     "failures": 0
   }
 }

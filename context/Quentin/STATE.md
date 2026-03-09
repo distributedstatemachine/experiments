@@ -31,69 +31,39 @@ To make decentralized training real on Basilica, we adapt SparseLoCo for its spe
 4. **Dynamic Topology & Density:** Nodes may join/leave. The algorithm handles a dynamic $R$ (number of replicas) via the asynchronous aggregator. We also implement **Dynamic Density Adjustment** to scale communication overhead based on real-time network latency.
 
 ## Implementation Progress
-- [x] Initial project structure defined.
-- [x] Implement core SparseLoCo components (TopK, Error Feedback, Quantization).
-- [x] Implement Asynchronous Aggregator for Basilica-style coordination.
-- [x] Implement SPoT (Sparse Proof of Training) verification mechanism.
-- [x] Create simulation script for benchmarking under churn and latency.
-- [x] Implement 2-bit quantization for sparse updates (Sign + 1-bit Magnitude).
-- [x] Implement Staleness Compensation in `BasilicaAggregator`.
-- [x] Refine SPoT with deterministic replay and verify against simulation.
-- [x] Analyze arXiv:2601.02360 for heterogeneous improvements.
+- [x] Initial project structure defined with `quentin/` and `quant/` isolation.
+- [x] Implement core SparseLoCo components in `quentin/sparseloco.py`.
+- [x] Implement Asynchronous Aggregator in `quentin/citadel_server.py`.
+- [x] Implement SPoT verification in `quentin/zk_spot.py`.
+- [x] Create simulation script `quentin/simulate_basilica.py`.
+- [x] Implement 2-bit quantization and Staleness Compensation.
+- [x] Refine SPoT with deterministic replay.
 - [x] Prototype `HeterogeneousSparseLoCo` with Subspace Compression.
-- [x] Integrate `basilica-sdk` for real machine rental and orchestration.
-- [x] Implement Embedding Drift Correction (Eq 3 & 4 from arXiv:2601.02360).
-- [x] Refine `run_basilica_experiment.py` for real worker deployment.
-- [x] Implement Complex SPoT with random layer verification to reduce aggregator overhead.
-- [x] Finalize `citadel_server.py` for decentralized worker coordination.
-- [x] Implement robust retry logic and error handling for unreliable Basilica nodes.
+- [x] Integrate `basilica-sdk` in `quentin/basilica_training.py`.
+- [x] Implement Embedding Drift Correction.
+- [x] Refine `quentin/run_basilica_experiment.py` for real worker deployment.
+- [x] Implement Complex SPoT with random layer verification.
+- [x] Finalize `quentin/citadel_server.py` for decentralized coordination.
+- [x] Implement robust retry logic and error handling.
 - [x] Verify environment setup and dependency management with `uv`.
-- [x] Finalize `citadel_server.py` and `run_basilica_experiment.py` for live deployment.
 - [x] Launch Citadel aggregator server on Basilica.
-- [x] Conduct first real experiment on Basilica using `run_basilica_experiment.py`.
-- [x] Migrated codebase to `https://github.com/distributedstatemachine/experiments` via SSH.
-- [x] Automated Citadel deployment with `deploy_citadel.py`.
+- [x] Conduct first real experiment on Basilica.
+- [x] Automated Citadel deployment with `quentin/deploy_citadel.py`.
 - [x] Enabled heterogeneous worker orchestration on Basilica.
-- [x] Implement a dashboard or logging mechanism to track real-time convergence and worker rewards.
-- [x] Benchmarking convergence speed vs. communication overhead in the live environment.
-- [x] Implement dynamic density adjustment based on network congestion.
-    - [x] Implement a real-time metrics dashboard (/metrics) for the Citadel aggregator.
-    - [x] Scale experiment to 12+ heterogeneous workers on Basilica.
-    - [x] Implement adaptive SPoT verification to reduce aggregator overhead.
-    - [x] Implement dynamic density adjustment based on network congestion.
-    - [x] Conduct live experiment and analyze convergence metrics from the Citadel dashboard.
-    - [x] Optimize incentive design for long-term participant retention.
-- [x] Implement loyalty-based reward multipliers in `BasilicaAggregator`.
-- [x] Reset loyalty on SPoT verification failure.
-- [x] Implement Adaptive Quantization (AQ) using mean/std buckets for 2-bit compression.
-- [x] Implement Global Outer Momentum in `BasilicaAggregator` to accelerate convergence.
-- [x] Update SPoT verification to handle statistical checks for AQ updates.
-- [x] Refine `HeterogeneousSparseLoCo` to support AQ in compressed workers.
-- [x] Implement Probabilistic Full Audits in SPoT (1% chance) to deter sophisticated cheaters.
-- [x] Implement Progressive Slashing (penalty increases with consecutive failures).
-- [x] Implement Heterogeneity-Aware Rewards (bonus for compressed/bandwidth-efficient workers).
-- [x] Implement Compounding Loyalty Bonuses for long-term participant retention.
-- [x] Implement Collusion Detection (Similarity-based) in `BasilicaAggregator`.
-- [x] Implement basic Dynamic Resource Allocation (Aggregator Election) logic.
-    - [x] Implement Byzantine-robust aggregation (Robust Coordinate-wise Median filter with MAD).
-    - [x] Implement ZK-SPoT for privacy-preserving verification.
-    - [x] Research Byzantine-robust aggregation for non-colluding noise injection.
-    - [x] Implement Nesterov Accelerated Gradient (NAG) for outer momentum.
-    - [x] Implement Layer-wise Adaptive Moments (LAMB) for decentralized setting.
-    - [x] Optimize communication scheduling (overlap computation and communication).
-    - [x] Implement Lookahead Optimizer for outer aggregation in `BasilicaAggregator`.
-- [x] Implement Polyak-style weight averaging in `BasilicaAggregator` for smoother convergence.
-- [x] Implement Gradient-Aware Communication Scheduling (GACS) to prioritize high-norm layers.
-- [x] Implement Adaptive Local Steps (ALS) based on global version divergence.
-- [x] Update SPoT verification with statistical checks for layer norms and GIS.
-- [x] Implement Sharpness-Aware Minimization (SAM) for local worker updates.
-- [x] Refactor worker training loop for communication overlapping.
-- [x] Implement Gradient-Informed Sparsity (GIS) to prioritize high-magnitude updates.
-- [x] Implement Federated Sharpness-Aware Minimization (FedSAM) for better global generalization.
+- [x] Implement real-time metrics dashboard (/metrics).
+- [x] Scale experiment to 12+ heterogeneous workers.
+- [x] Implement adaptive SPoT verification.
+- [x] Implement loyalty-based reward multipliers and Progressive Slashing.
+- [x] Implement Adaptive Quantization (AQ) and Global Outer Momentum.
+- [x] Implement Collusion Detection and Dynamic Aggregator Election.
+- [x] Implement Byzantine-robust aggregation (Coordinate-wise Median).
+- [x] Implement Nesterov Accelerated Gradient (NAG) and LAMB.
+- [x] Implement Lookahead Optimizer and Polyak-style weight averaging.
+- [x] Implement Gradient-Aware Communication Scheduling (GACS) and ALS.
+- [x] Implement Sharpness-Aware Minimization (SAM) and FedSAM.
 - [x] Optimize communication overlapping with background thread synchronization.
-- [x] Benchmark ZK-SPoT vs SPoT overhead and provide performance report.
-- [x] Refine Lookahead, FedSAM, and GIS for better convergence and performance.
-- [x] Verify communication overlapping in worker training loop.
+- [x] Implement Gradient-Informed Sparsity (GIS).
+- [x] Benchmark ZK-SPoT vs SPoT overhead.
 
 ## Next Research Directions: "Advanced Convergence & Performance Optimization"
 1. **Lookahead Aggregation:** Integrated Lookahead optimizer into `BasilicaAggregator` to stabilize the global trajectory by maintaining "slow weights" that interpolate with the fast, asynchronously updated weights.

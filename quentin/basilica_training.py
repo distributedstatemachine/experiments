@@ -98,7 +98,7 @@ class HeterogeneousSparseLoCo:
                     self.t_perp[name] = torch.zeros_like(module.weight.data)
 
     @torch.no_grad()
-    def get_sparse_update(self, task_id: str = "default") -> dict:
+    def get_sparse_update(self) -> dict:
         """
         Computes the sparse, quantized pseudo-gradient with Adaptive Quantization (AQ)
         and optional LAMB-style adaptive rate scaling.
@@ -116,6 +116,7 @@ class HeterogeneousSparseLoCo:
             layer_norms.append(g_norm)
             
             if self.use_lamb:
+                # ... existing LAMB code ...
                 # Update moments
                 self.m[i].mul_(self.beta1).add_(g, alpha=1 - self.beta1)
                 self.v[i].mul_(self.beta2).addcmul_(g, g, value=1 - self.beta2)
@@ -182,8 +183,7 @@ class HeterogeneousSparseLoCo:
             'updates': updates, 
             'is_compressed': self.is_compressed, 
             'density': self.density,
-            'layer_norms': layer_norms,
-            'task_id': task_id
+            'layer_norms': layer_norms
         }
 
     def adjust_density(self, network_latency: float):
@@ -239,6 +239,10 @@ class HeterogeneousSparseLoCo:
             if version_diff > 50: # Significant divergence
                 # In a real system, we'd adjust self.h_steps or local_lr
                 print(f"[ALS] Significant divergence ({version_diff} versions). Re-anchoring...")
+                # Re-anchoring logic: if we are too far behind, we might want to 
+                # reset or dampen our local updates to avoid destructive interference.
+                for i in range(len(self.params)):
+                    self.error_buffers[i].mul_(0.5) # Dampen error feedback
         
         self.last_sync_version = global_version if global_version is not None else 0
 

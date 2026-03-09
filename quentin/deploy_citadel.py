@@ -8,13 +8,15 @@ API_KEY = os.getenv("BASILICA_API_TOKEN")
 def deploy_citadel():
     client = BasilicaClient(api_key=API_KEY)
     
-    # Read the required files to bundle them
-    with open("citadel_server.py", "r") as f:
+    # Read the required files to bundle them from quentin/ and shared/
+    with open("quentin/citadel_server.py", "r") as f:
         citadel_server_code = f.read()
-    with open("sparseloco.py", "r") as f:
+    with open("quentin/sparseloco.py", "r") as f:
         sparseloco_code = f.read()
-    with open("main_model.py", "r") as f:
+    with open("shared/main_model.py", "r") as f:
         main_model_code = f.read()
+    with open("quentin/zk_spot.py", "r") as f:
+        zk_spot_code = f.read()
 
     # Bundle the code
     source_code = f"""
@@ -28,15 +30,17 @@ with open("sparseloco.py", "w") as f:
     f.write({repr(sparseloco_code)})
 with open("main_model.py", "w") as f:
     f.write({repr(main_model_code)})
+with open("zk_spot.py", "w") as f:
+    f.write({repr(zk_spot_code)})
 
-    # Run the server
-    import uvicorn
-    import os
-    from citadel_server import app
-    if __name__ == "__main__":
-        # Set environment variables manually for the aggregator
-        os.environ["BASILICA_API_TOKEN"] = {repr(API_KEY)}
-        uvicorn.run(app, host="0.0.0.0", port=8000)
+# Run the server
+import uvicorn
+import os
+from citadel_server import app
+if __name__ == "__main__":
+    # Set environment variables manually for the aggregator
+    os.environ["BASILICA_API_TOKEN"] = {repr(API_KEY)}
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 """
 
     print("Deploying Citadel Aggregator to Basilica...")
