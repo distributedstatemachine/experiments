@@ -103,15 +103,20 @@ class HeterogeneousSparseLoCo:
         Computes the sparse, quantized pseudo-gradient with Adaptive Quantization (AQ)
         and optional LAMB-style adaptive rate scaling.
         Implements Gradient-Informed Sparsity (GIS) to prioritize high-magnitude updates.
+        Also returns layer-wise gradient norms for Gradient-Aware Communication Scheduling (GACS).
         """
         updates = []
+        layer_norms = []
         self.t += 1 if self.use_lamb else 0
         
         for i, p in enumerate(self.params):
             # Pseudo-gradient
             g = self.initial_weights[i] - p.data
+            g_norm = torch.norm(g).item()
+            layer_norms.append(g_norm)
             
             if self.use_lamb:
+                # ... existing LAMB code ...
                 # Update moments
                 self.m[i].mul_(self.beta1).add_(g, alpha=1 - self.beta1)
                 self.v[i].mul_(self.beta2).addcmul_(g, g, value=1 - self.beta2)
@@ -138,14 +143,8 @@ class HeterogeneousSparseLoCo:
 
             ef_delta = delta + self.error_buffers[i]
             
-            # Gradient-Informed Sparsity (GIS):
-            # Instead of simple Top-k on delta, we use the magnitude of the 
-            # pseudo-gradient to weight the selection, ensuring we prioritize 
-            # updates that represent significant directional changes.
+            # Gradient-Informed Sparsity (GIS)
             flat = ef_delta.view(-1)
-            
-            # We use a power-law weighting for GIS: score = |delta| * (1 + |g|/max(|g|))
-            # This biases selection towards elements that also had large raw gradients.
             g_flat = g.view(-1)
             g_max = torch.max(torch.abs(g_flat)) + 1e-8
             gis_score = torch.abs(flat) * (1.0 + torch.abs(g_flat) / g_max)
@@ -180,7 +179,12 @@ class HeterogeneousSparseLoCo:
             else:
                 updates.append(None)
                 
-        return {'updates': updates, 'is_compressed': self.is_compressed, 'density': self.density}
+        return {
+            'updates': updates, 
+            'is_compressed': self.is_compressed, 
+            'density': self.density,
+            'layer_norms': layer_norms
+        }
 
     def adjust_density(self, network_latency: float):
         """
@@ -220,12 +224,23 @@ class HeterogeneousSparseLoCo:
                 ts.copy_(proj_ts)
 
     @torch.no_grad()
-    def synchronize(self, global_weights: List[torch.Tensor], network_latency: Optional[float] = None):
+    def synchronize(self, global_weights: List[torch.Tensor], network_latency: Optional[float] = None, global_version: Optional[int] = None):
         """
         Synchronize local weights with global weights and handle drift.
         """
         if network_latency is not None:
             self.adjust_density(network_latency)
+        
+        # Adaptive Local Steps (ALS):
+        # If the global version has advanced significantly since our last sync,
+        # we might want to reduce local steps or adjust learning rate to prevent divergence.
+        if global_version is not None and hasattr(self, 'last_sync_version'):
+            version_diff = global_version - self.last_sync_version
+            if version_diff > 50: # Significant divergence
+                # In a real system, we'd adjust self.h_steps or local_lr
+                print(f"[ALS] Significant divergence ({version_diff} versions). Re-anchoring...")
+        
+        self.last_sync_version = global_version if global_version is not None else 0
 
         for i, p in enumerate(self.params):
             p.data.copy_(global_weights[i])

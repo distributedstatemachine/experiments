@@ -119,7 +119,7 @@ class BasilicaAggregator:
     Asynchronous SparseLoCo Aggregator for the Basilica "Citadel".
     Handles sparse updates from heterogeneous workers.
     """
-    def __init__(self, model: nn.Module, outer_lr: float = 0.7, beta: float = 0.9, use_nag: bool = True, verifier: Optional[SPoTVerifier] = None, use_lookahead: bool = True, la_steps: int = 5, la_alpha: float = 0.5):
+    def __init__(self, model: nn.Module, outer_lr: float = 0.7, beta: float = 0.9, use_nag: bool = True, verifier: Optional[SPoTVerifier] = None, use_lookahead: bool = True, la_steps: int = 5, la_alpha: float = 0.5, use_polyak: bool = True, polyak_alpha: float = 0.999):
         self.model = model
         self.outer_lr = outer_lr
         self.beta = beta
@@ -133,6 +133,11 @@ class BasilicaAggregator:
         self.la_alpha = la_alpha
         self.slow_weights = [p.data.clone().detach() for p in self.params]
         self.la_counter = 0
+        
+        # Polyak Averaging state
+        self.use_polyak = use_polyak
+        self.polyak_alpha = polyak_alpha
+        self.polyak_weights = [p.data.clone().detach() for p in self.params]
         
         # Version tracking for asynchronous updates
         self.global_version = 0
@@ -213,7 +218,8 @@ class BasilicaAggregator:
                 verification_data['h_steps'],
                 verification_data['lr'],
                 verification_data['seed'],
-                layer_indices=layer_indices
+                layer_indices=layer_indices,
+                layer_norms=verification_data.get('layer_norms')
             )
             
             if not is_valid:
@@ -325,6 +331,12 @@ class BasilicaAggregator:
                     # between the fast, asynchronously updated weights and the slow weights.
                     self.slow_weights[i].add_(p.data - self.slow_weights[i], alpha=self.la_alpha)
                     p.data.copy_(self.slow_weights[i])
+
+        # 4.5 Polyak Averaging: Maintain a running average of weights for smoother convergence
+        if self.use_polyak:
+            for i, p in enumerate(self.params):
+                # polyak = alpha * polyak + (1 - alpha) * current
+                self.polyak_weights[i].mul_(self.polyak_alpha).add_(p.data, alpha=1.0 - self.polyak_alpha)
         
         # 5. Incentive Design: Loyalty Bonus & Heterogeneity Factor
         # Reward = (Base + LoyaltyBonus) * HeterogeneityFactor
@@ -363,7 +375,13 @@ class BasilicaAggregator:
         if worker_id in self.worker_rewards:
             self.worker_rewards[worker_id] = max(0, self.worker_rewards[worker_id] - 10)
 
-    def get_global_weights(self) -> List[torch.Tensor]:
+    def get_global_weights(self, use_polyak: bool = False) -> List[torch.Tensor]:
+        """
+        Returns the current global model weights.
+        If use_polyak is True, returns the Polyak-averaged weights for smoother convergence.
+        """
+        if use_polyak and self.use_polyak:
+            return [w.clone().detach() for w in self.polyak_weights]
         return [p.data.clone().detach() for p in self.params]
 
 # Verification Mechanism: Sparse Proof of Training (SPoT)
@@ -385,7 +403,8 @@ class SPoTVerifier:
         h_steps: int,
         lr: float,
         seed: int,
-        layer_indices: Optional[List[int]] = None
+        layer_indices: Optional[List[int]] = None,
+        layer_norms: Optional[List[float]] = None
     ) -> bool:
         """
         Verifies that the sparse update is consistent with a deterministic local training run.
@@ -416,6 +435,18 @@ class SPoTVerifier:
         
         for i in check_indices:
             p = list(test_model.parameters())[i]
+            
+            # 4. Statistical Checks for AQ and GIS
+            # Check if the worker's reported layer norm is consistent with local computation
+            if layer_norms:
+                expected_norm = torch.norm(initial_weights[i] - p.data).item()
+                actual_norm = layer_norms[i]
+                if actual_norm > 0:
+                    norm_diff = abs(expected_norm - actual_norm) / (expected_norm + 1e-8)
+                    if norm_diff > 0.1:
+                        print(f"SPoT Fail: Layer norm diff {norm_diff:.2f} > 0.1 for layer {i}")
+                        return False
+
             # Note: In a real SPoT, we'd also need to track the error buffer 
             # from the previous synchronization to be 100% accurate.
             # For this simulation, we assume error buffers were reset at sync.

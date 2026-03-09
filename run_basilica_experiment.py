@@ -123,7 +123,8 @@ class Worker:
             "version": self.version,
             "bits": [u['bits'].tolist() if u else [] for u in update['updates']],
             "indices": [u['indices'].tolist() if u else [] for u in update['updates']],
-            "scales": [u['scale'].tolist() if u else [0.0, 0.0] for u in update['updates']]
+            "scales": [u['scale'].tolist() if u else [0.0, 0.0] for u in update['updates']],
+            "layer_norms": update.get('layer_norms', [])
         }
 
         if zk_proof:
@@ -171,11 +172,13 @@ class Worker:
         max_retries = 10
         for attempt in range(max_retries):
             try:
-                resp = requests.get(f"{{CITADEL_URL}}/weights", timeout=60)
+                # Use Polyak weights for smoother convergence if available
+                resp = requests.get(f"{{CITADEL_URL}}/weights?use_polyak=true", timeout=60)
                 resp.raise_for_status()
                 data = resp.json()
                 weights = [torch.tensor(w) for w in data['weights']]
-                return weights
+                version = data.get('version', 0)
+                return weights, version
             except Exception as e:
                 print(f"Pull weights attempt {{attempt + 1}} failed: {{e}}")
                 if attempt == max_retries - 1:
@@ -204,13 +207,25 @@ class Worker:
                 update, zk_proof = update_task
                 try:
                     sync_start = time.time()
+                    
+                    # Gradient-Aware Communication Scheduling (GACS):
+                    # Sort layers by gradient norm and only send those above a threshold
+                    # or limit the number of layers sent to save bandwidth.
+                    if 'layer_norms' in update:
+                        norms = torch.tensor(update['layer_norms'])
+                        # Only send layers in the top 50% of gradient norms
+                        threshold = torch.median(norms)
+                        for i, norm in enumerate(update['layer_norms']):
+                            if norm < threshold:
+                                update['updates'][i] = None
+                    
                     self.push_update(update, zk_proof=zk_proof)
-                    global_weights = self.pull_weights()
+                    global_weights, global_version = self.pull_weights()
                     sync_time = time.time() - sync_start
                     
                     # We can't apply weights directly here as it might interfere with training
                     # Instead, we store them for the main thread to pick up
-                    self.pending_weights = (global_weights, sync_time)
+                    self.pending_weights = (global_weights, global_version, sync_time)
                     print(f"[BackgroundSync] Completed in {sync_time:.4f}s")
                 except Exception as e:
                     print(f"[BackgroundSync] Failed: {e}")
@@ -229,10 +244,10 @@ class Worker:
             
             # Check for pending weights from background sync
             if self.pending_weights:
-                weights, sync_time = self.pending_weights
-                self.optimizer.synchronize(weights, network_latency=sync_time)
+                weights, version, sync_time = self.pending_weights
+                self.optimizer.synchronize(weights, network_latency=sync_time, global_version=version)
                 self.pending_weights = None
-                print(f"Applied background weights | Version: {self.version}")
+                print(f"Applied background weights | Version: {version}")
 
             # For SPoT, we need to capture the state before local steps
             initial_weights = [p.data.clone().detach() for p in self.model.parameters()]

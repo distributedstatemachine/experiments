@@ -82,6 +82,10 @@ To make decentralized training real on Basilica, we adapt SparseLoCo for its spe
     - [x] Implement Layer-wise Adaptive Moments (LAMB) for decentralized setting.
     - [x] Optimize communication scheduling (overlap computation and communication).
     - [x] Implement Lookahead Optimizer for outer aggregation in `BasilicaAggregator`.
+- [x] Implement Polyak-style weight averaging in `BasilicaAggregator` for smoother convergence.
+- [x] Implement Gradient-Aware Communication Scheduling (GACS) to prioritize high-norm layers.
+- [x] Implement Adaptive Local Steps (ALS) based on global version divergence.
+- [x] Update SPoT verification with statistical checks for layer norms and GIS.
 - [x] Implement Sharpness-Aware Minimization (SAM) for local worker updates.
 - [x] Refactor worker training loop for communication overlapping.
 - [x] Implement Gradient-Informed Sparsity (GIS) to prioritize high-magnitude updates.

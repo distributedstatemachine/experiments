@@ -72,9 +72,9 @@ async def get_metrics():
     }
 
 @app.get("/weights")
-async def get_weights():
+async def get_weights(use_polyak: bool = False):
     """Returns the current global model weights."""
-    weights = aggregator.get_global_weights()
+    weights = aggregator.get_global_weights(use_polyak=use_polyak)
     # Convert tensors to lists for JSON serialization
     return {"weights": [w.tolist() for w in weights], "version": aggregator.global_version}
 
@@ -127,6 +127,7 @@ async def push_update(update_data: Dict[str, Any]):
                 torch.tensor(verification_data['data_shard'][0]),
                 torch.tensor(verification_data['data_shard'][1])
             )
+            verification_data['layer_norms'] = update_data.get('layer_norms', [])
 
             success = aggregator.apply_sparse_update(
                 bits, 
