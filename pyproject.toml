@@ -8,6 +8,11 @@ dependencies = [
     "requests",
     "python-dotenv",
     "pyTelegramBotAPI",
+    "torch>=2.10.0",
+    "numpy>=2.2.6",
+    "basilica-sdk>=0.25.0",
+    "fastapi",
+    "uvicorn",
 ]
 
 [tool.setuptools]
