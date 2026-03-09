@@ -2,7 +2,7 @@ import os
 import torch
 import torch.nn as nn
 from basilica import BasilicaClient
-from basilica_training import HeterogeneousSparseLoCo
+from quentin.basilica_training import HeterogeneousSparseLoCo
 import time
 import requests
 import json
@@ -86,7 +86,7 @@ with open("zk_spot.py", "w") as f:
 
 import torch
 import torch.nn as nn
-from basilica_training import HeterogeneousSparseLoCo
+from quentin.basilica_training import HeterogeneousSparseLoCo
 from zk_spot import PrivacyAwareWorker
 import requests
 import json

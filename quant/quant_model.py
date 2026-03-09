@@ -1,6 +1,11 @@
 import torch
 import torch.nn as nn
 from transformers import AutoModel, AutoConfig
+import sys
+import os
+# Add parent directory to sys.path to import basilica_training
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from quentin.basilica_training import HeterogeneousSparseLoCo
 
 class TimeSeriesFoundationModel(nn.Module):
     """
@@ -31,3 +36,20 @@ class TimeSeriesFoundationModel(nn.Module):
 
 def get_quant_model():
     return TimeSeriesFoundationModel()
+
+class QuantFineTuner:
+    """
+    Integrates the Quant model with Basilica's decentralized fine-tuning.
+    """
+    def __init__(self, model: nn.Module, is_compressed: bool = True):
+        self.model = model
+        self.trainer = HeterogeneousSparseLoCo(model, is_compressed=is_compressed, d_model=model.d_model)
+        
+    def train_step(self, inputs, targets, lr=1e-4):
+        return self.trainer.local_step(inputs, targets, lr)
+        
+    def get_update(self):
+        return self.trainer.get_sparse_update(task_id="quant_finetuning")
+        
+    def sync(self, global_weights, version):
+        self.trainer.synchronize(global_weights, global_version=version)

@@ -21,6 +21,9 @@ Building a SOTA quant trading system on Hyperliquid using time-series foundation
 ## Next Steps
 - [ ] Finalize Hyperliquid L2/L3 data ingestion pipeline.
 - [ ] Integrate quant model with `quentin/basilica_training.py` for decentralized fine-tuning.
-- [ ] Implement backtesting and risk management modules.
-- [ ] Run large-scale pretraining on Basilica with 12+ workers.
+- [ ] Run large-scale pretraining on Basilica with 12+ workers using Quentin's research.
 - [ ] Implement ZK-SPoT for privacy-preserving verification of proprietary trading features.
+- [x] Refactored codebase to explicitly separate `Quentin` (Research) and `Quant` (Trading) tasks.
+- [x] Updated all imports in `quentin/` and `quant/` to use the new namespaced structure.
+- [x] Refined `quentin/deploy_citadel.py` and `quentin/run_basilica_experiment.py` to correctly bundle files from their new locations.
+- [x] Fixed `quant/quant_worker.py` and `quant/quant_aggregator.py` to point to the correct research modules in `quentin/`.

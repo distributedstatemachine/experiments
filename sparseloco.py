@@ -164,23 +164,31 @@ class BasilicaAggregator:
         sparse_scales: List[torch.Tensor],
         worker_id: str,
         worker_version: int,
-        verification_data: Optional[Dict] = None
+        verification_data: Optional[Dict] = None,
+        task_id: str = "default"
     ):
         """
         Applies a sparse update to the global model with staleness compensation, 
         Adaptive Dequantization, and Byzantine-robust Aggregation (Krum/Median).
         """
-        # 0. Collusion Detection (Similarity-based)
+        # 0. Task Differentiation
+        if not hasattr(self, 'task_versions'):
+            self.task_versions = {}
+        
+        if task_id not in self.task_versions:
+            self.task_versions[task_id] = 0
+
+        # 0.1 Collusion Detection (Similarity-based)
         # ... existing collusion detection code ...
         update_data = []
         for idx, bits in zip(sparse_indices, sparse_bits):
             update_data.append(tuple(idx.tolist()))
             update_data.append(tuple(bits.tolist()))
-        update_hash = hash(tuple(update_data))
+        update_hash = hash((task_id, tuple(update_data)))
         
         for other_id, other_hash in self.recent_updates.items():
             if other_id != worker_id and other_hash == update_hash:
-                print(f"COLLUSION ALERT: Worker {worker_id} and {other_id} submitted identical updates!")
+                print(f"COLLUSION ALERT: Worker {worker_id} and {other_id} submitted identical updates for task {task_id}!")
                 # Penalize both workers heavily for collusion
                 for wid in [worker_id, other_id]:
                     self.worker_slashes[wid] = self.worker_slashes.get(wid, 0) + 2
@@ -206,7 +214,7 @@ class BasilicaAggregator:
             # 1% chance of full verification to deter sophisticated cheaters
             is_full_audit = torch.rand(1).item() < 0.01
             if is_full_audit:
-                print(f"AUDIT: Performing FULL SPoT verification for worker {worker_id}")
+                print(f"AUDIT: Performing FULL SPoT verification for worker {worker_id} on task {task_id}")
                 layer_indices = None 
 
             is_valid = self.verifier.verify_update(
@@ -223,7 +231,7 @@ class BasilicaAggregator:
             )
             
             if not is_valid:
-                print(f"ALERT: Worker {worker_id} failed SPoT verification! Slashing rewards.")
+                print(f"ALERT: Worker {worker_id} failed SPoT verification for task {task_id}! Slashing rewards.")
                 # Progressive Slashing: penalty increases exponentially with consecutive failures
                 self.worker_slashes[worker_id] = self.worker_slashes.get(worker_id, 0) + 1
                 self.worker_loyalty[worker_id] = 0 # Reset loyalty on failure
@@ -236,8 +244,11 @@ class BasilicaAggregator:
         # 2. Byzantine-robust filtering (Coordinate-wise Median)
         # We check if the update is an outlier compared to recent updates
         # This prevents "noise injection" that passes SPoT but degrades convergence.
-        if not hasattr(self, 'update_history'):
-            self.update_history = [] # List of recent dequantized updates
+        if not hasattr(self, 'task_histories'):
+            self.task_histories = {} # task_id -> list of recent dequantized updates
+            
+        if task_id not in self.task_histories:
+            self.task_histories[task_id] = []
 
         # Dequantize update for filtering
         dequant_update = []
@@ -263,10 +274,11 @@ class BasilicaAggregator:
 
         # Check for Byzantine behavior (Coordinate-wise Median filter)
         # If we have enough history, check if this update is too far from the median
-        if len(self.update_history) >= 5:
+        history = self.task_histories[task_id]
+        if len(history) >= 5:
             # Stack recent updates for each parameter
             for i, p in enumerate(self.params):
-                recent_vals = torch.stack([h[i] for h in self.update_history])
+                recent_vals = torch.stack([h[i] for h in history])
                 # Compute median and MAD (Median Absolute Deviation) for robustness
                 # Standard deviation is sensitive to the very outliers we're trying to detect
                 median = torch.median(recent_vals, dim=0).values
@@ -279,7 +291,7 @@ class BasilicaAggregator:
                     # Robust Z-score = 0.6745 * (x - median) / MAD
                     z_scores = 0.6745 * torch.abs(dequant_update[i][mask] - median[mask]) / mad[mask]
                     if torch.mean(z_scores) > 5.0:
-                        print(f"BYZANTINE ALERT: Worker {worker_id} update rejected (Robust Z-score={torch.mean(z_scores):.2f})")
+                        print(f"BYZANTINE ALERT: Worker {worker_id} update rejected for task {task_id} (Robust Z-score={torch.mean(z_scores):.2f})")
                         self.worker_loyalty[worker_id] = 0
                         # Progressive Slashing for Byzantine behavior
                         self.worker_slashes[worker_id] = self.worker_slashes.get(worker_id, 0) + 1
@@ -288,12 +300,12 @@ class BasilicaAggregator:
                         return False
 
         # Update history
-        self.update_history.append(dequant_update)
-        if len(self.update_history) > 10:
-            self.update_history.pop(0)
+        history.append(dequant_update)
+        if len(history) > 10:
+            history.pop(0)
 
         # 3. Staleness compensation: reduce outer_lr if worker is behind
-        staleness = self.global_version - worker_version
+        staleness = self.task_versions[task_id] - worker_version
         effective_lr = self.outer_lr / (1.0 + 0.1 * max(0, staleness)) 
 
         for i, p in enumerate(self.params):
@@ -317,8 +329,9 @@ class BasilicaAggregator:
                 # Standard momentum update: p = p - lr * m
                 p.data.view(-1)[idx] -= effective_lr * m.view(-1)[idx]
             
+        self.task_versions[task_id] += 1
         self.global_version += 1
-        self.worker_versions[worker_id] = self.global_version
+        self.worker_versions[worker_id] = self.task_versions[task_id]
         
         # 4. Lookahead Update: Slow weights update every k steps
         if self.use_lookahead:
