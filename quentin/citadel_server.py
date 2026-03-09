@@ -118,6 +118,7 @@ async def push_update(update_data: Dict[str, Any]):
                 zk_proof['proof']['sparse_scales'], 
                 update_data['worker_id'], 
                 update_data['version'],
+                task_id=update_data.get('task_id', 'default'),
                 verification_data=None # Already verified via ZK
             )
         elif verification_data:
@@ -135,6 +136,7 @@ async def push_update(update_data: Dict[str, Any]):
                 scales, 
                 update_data['worker_id'], 
                 update_data['version'],
+                task_id=update_data.get('task_id', 'default'),
                 verification_data=verification_data
             )
         else:
@@ -144,7 +146,8 @@ async def push_update(update_data: Dict[str, Any]):
                 indices, 
                 scales, 
                 update_data['worker_id'], 
-                update_data['version']
+                update_data['version'],
+                task_id=update_data.get('task_id', 'default')
             )
         
         if not success:

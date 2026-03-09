@@ -121,7 +121,20 @@ class BasilicaAggregator:
     Asynchronous SparseLoCo Aggregator for the Basilica "Citadel".
     Handles sparse updates from heterogeneous workers.
     """
-    def __init__(self, model: nn.Module, outer_lr: float = 0.7, beta: float = 0.9, use_nag: bool = True, use_lamb: bool = True, verifier: Optional[SPoTVerifier] = None, use_lookahead: bool = True, la_steps: int = 5, la_alpha: float = 0.5, use_polyak: bool = True, polyak_alpha: float = 0.999):
+    def __init__(
+        self, 
+        model: nn.Module, 
+        outer_lr: float = 0.7, 
+        beta: float = 0.9, 
+        use_nag: bool = True, 
+        use_lamb: bool = True, 
+        verifier: Optional[SPoTVerifier] = None, 
+        use_lookahead: bool = True, 
+        la_steps: int = 5, 
+        la_alpha: float = 0.5, 
+        use_polyak: bool = True, 
+        polyak_alpha: float = 0.999
+    ):
         self.model = model
         self.outer_lr = outer_lr
         self.beta = beta
@@ -130,34 +143,36 @@ class BasilicaAggregator:
         self.params = list(model.parameters())
         self.verifier = verifier
         
-        # Lookahead state
+        # Task-specific state
+        self.task_states = {} # task_id -> {slow_weights, polyak_weights, global_version, worker_versions, momentum_buffers, ...}
+        
+        # Lookahead state (defaults)
         self.use_lookahead = use_lookahead
         self.la_steps = la_steps
         self.la_alpha = la_alpha
-        self.slow_weights = [p.data.clone().detach() for p in self.params]
-        self.la_counter = 0
         
-        # Polyak Averaging state
+        # Polyak Averaging state (defaults)
         self.use_polyak = use_polyak
         self.polyak_alpha = polyak_alpha
-        self.polyak_weights = [p.data.clone().detach() for p in self.params]
         
-        # Version tracking for asynchronous updates
-        self.global_version = 0
-        self.worker_versions = {}
-        
-        # Outer momentum buffers (M_i)
-        self.momentum_buffers = [torch.zeros_like(p.data) for p in self.params]
-        
-        # Incentive state: track worker reputation/rewards
+        # Global state (shared across tasks if needed, but mostly per-task now)
         self.worker_rewards = {}
         self.worker_slashes = {}
-        
-        # Multiplier for long-term retention (loyalty bonus)
-        self.worker_loyalty = {} # Tracks consecutive valid updates
-        
-        # Collusion detection: track recent updates to find identical submissions
-        self.recent_updates = {} # worker_id -> hash of update
+        self.worker_loyalty = {}
+        self.recent_updates = {} # (task_id, worker_id) -> hash
+
+    def _get_task_state(self, task_id: str):
+        if task_id not in self.task_states:
+            self.task_states[task_id] = {
+                'slow_weights': [p.data.clone().detach() for p in self.params],
+                'polyak_weights': [p.data.clone().detach() for p in self.params],
+                'la_counter': 0,
+                'global_version': 0,
+                'worker_versions': {},
+                'momentum_buffers': [torch.zeros_like(p.data) for p in self.params],
+                'update_history': []
+            }
+        return self.task_states[task_id]
 
     @torch.no_grad()
     def apply_sparse_update(
@@ -167,49 +182,44 @@ class BasilicaAggregator:
         sparse_scales: List[torch.Tensor],
         worker_id: str,
         worker_version: int,
+        task_id: str = "default",
         verification_data: Optional[Dict] = None
     ):
         """
-        Applies a sparse update to the global model with staleness compensation, 
-        Adaptive Dequantization, and Byzantine-robust Aggregation (Krum/Median).
+        Applies a sparse update to the global model with task isolation.
         """
+        state = self._get_task_state(task_id)
+        
         # 0. Collusion Detection (Similarity-based)
-        # ... existing collusion detection code ...
         update_data = []
         for idx, bits in zip(sparse_indices, sparse_bits):
             update_data.append(tuple(idx.tolist()))
             update_data.append(tuple(bits.tolist()))
         update_hash = hash(tuple(update_data))
         
-        for other_id, other_hash in self.recent_updates.items():
-            if other_id != worker_id and other_hash == update_hash:
-                print(f"COLLUSION ALERT: Worker {worker_id} and {other_id} submitted identical updates!")
-                # Penalize both workers heavily for collusion
-                for wid in [worker_id, other_id]:
-                    self.worker_slashes[wid] = self.worker_slashes.get(wid, 0) + 2
-                    self.worker_loyalty[wid] = 0
-                    self.worker_rewards[wid] = max(0, self.worker_rewards.get(wid, 0.0) - 20.0)
+        update_key = (task_id, worker_id)
+        for (tid, wid), other_hash in self.recent_updates.items():
+            if tid == task_id and wid != worker_id and other_hash == update_hash:
+                print(f"COLLUSION ALERT: Worker {worker_id} and {wid} submitted identical updates for task {task_id}!")
+                for target_id in [worker_id, wid]:
+                    self.worker_slashes[target_id] = self.worker_slashes.get(target_id, 0) + 2
+                    self.worker_loyalty[target_id] = 0
+                    self.worker_rewards[target_id] = max(0, self.worker_rewards.get(target_id, 0.0) - 20.0)
                 return False
         
-        self.recent_updates[worker_id] = update_hash
-        # Limit history to prevent memory leak
-        if len(self.recent_updates) > 100:
+        self.recent_updates[update_key] = update_hash
+        if len(self.recent_updates) > 500:
             self.recent_updates.pop(next(iter(self.recent_updates)))
 
-        # 1. SPoT Verification (if verifier and data provided)
-        # ... existing SPoT verification code ...
+        # 1. SPoT Verification
         if self.verifier and verification_data:
-            # Random layer verification to reduce overhead
             num_layers = len(self.params)
-            # Verify ~10% of layers randomly, but at least 1
             num_to_verify = max(1, int(0.1 * num_layers))
             layer_indices = torch.randperm(num_layers)[:num_to_verify].tolist()
             
-            # Check if we should perform a full verification (probabilistic audit)
-            # 1% chance of full verification to deter sophisticated cheaters
             is_full_audit = torch.rand(1).item() < 0.01
             if is_full_audit:
-                print(f"AUDIT: Performing FULL SPoT verification for worker {worker_id}")
+                print(f"AUDIT: Performing FULL SPoT verification for worker {worker_id} on task {task_id}")
                 layer_indices = None 
 
             is_valid = self.verifier.verify_update(
@@ -226,23 +236,14 @@ class BasilicaAggregator:
             )
             
             if not is_valid:
-                print(f"ALERT: Worker {worker_id} failed SPoT verification! Slashing rewards.")
-                # Progressive Slashing: penalty increases exponentially with consecutive failures
+                print(f"ALERT: Worker {worker_id} failed SPoT verification for task {task_id}!")
                 self.worker_slashes[worker_id] = self.worker_slashes.get(worker_id, 0) + 1
-                self.worker_loyalty[worker_id] = 0 # Reset loyalty on failure
-                
-                # Formula: 10 * 2^(slashes - 1)
+                self.worker_loyalty[worker_id] = 0
                 slash_penalty = 10.0 * (2.0 ** (self.worker_slashes[worker_id] - 1))
                 self.worker_rewards[worker_id] = max(0, self.worker_rewards.get(worker_id, 0.0) - slash_penalty)
                 return False
 
         # 2. Byzantine-robust filtering (Coordinate-wise Median)
-        # We check if the update is an outlier compared to recent updates
-        # This prevents "noise injection" that passes SPoT but degrades convergence.
-        if not hasattr(self, 'update_history'):
-            self.update_history = [] # List of recent dequantized updates
-
-        # Dequantize update for filtering
         dequant_update = []
         for i, p in enumerate(self.params):
             bits = sparse_bits[i]
@@ -264,39 +265,29 @@ class BasilicaAggregator:
             full_val[idx] = val
             dequant_update.append(full_val.view(p.shape))
 
-        # Check for Byzantine behavior (Coordinate-wise Median filter)
-        # If we have enough history, check if this update is too far from the median
-        if len(self.update_history) >= 5:
-            # Stack recent updates for each parameter
+        if len(state['update_history']) >= 5:
             for i, p in enumerate(self.params):
-                recent_vals = torch.stack([h[i] for h in self.update_history])
-                # Compute median and MAD (Median Absolute Deviation) for robustness
-                # Standard deviation is sensitive to the very outliers we're trying to detect
+                recent_vals = torch.stack([h[i] for h in state['update_history']])
                 median = torch.median(recent_vals, dim=0).values
                 mad = torch.median(torch.abs(recent_vals - median), dim=0).values + 1e-8
                 
-                # Z-score check (using MAD): if update is > 5 sigma from median, it's suspicious
-                # We only check non-zero entries in the sparse update
                 mask = dequant_update[i] != 0
                 if mask.any():
-                    # Robust Z-score = 0.6745 * (x - median) / MAD
                     z_scores = 0.6745 * torch.abs(dequant_update[i][mask] - median[mask]) / mad[mask]
                     if torch.mean(z_scores) > 5.0:
-                        print(f"BYZANTINE ALERT: Worker {worker_id} update rejected (Robust Z-score={torch.mean(z_scores):.2f})")
+                        print(f"BYZANTINE ALERT: Worker {worker_id} update rejected for task {task_id} (Z-score={torch.mean(z_scores):.2f})")
                         self.worker_loyalty[worker_id] = 0
-                        # Progressive Slashing for Byzantine behavior
                         self.worker_slashes[worker_id] = self.worker_slashes.get(worker_id, 0) + 1
                         slash_penalty = 20.0 * (2.0 ** (self.worker_slashes[worker_id] - 1))
                         self.worker_rewards[worker_id] = max(0, self.worker_rewards.get(worker_id, 0.0) - slash_penalty)
                         return False
 
-        # Update history
-        self.update_history.append(dequant_update)
-        if len(self.update_history) > 10:
-            self.update_history.pop(0)
+        state['update_history'].append(dequant_update)
+        if len(state['update_history']) > 10:
+            state['update_history'].pop(0)
 
-        # 3. Staleness compensation: reduce outer_lr if worker is behind
-        staleness = self.global_version - worker_version
+        # 3. Staleness compensation
+        staleness = state['global_version'] - worker_version
         effective_lr = self.outer_lr / (1.0 + 0.1 * max(0, staleness)) 
 
         for i, p in enumerate(self.params):
@@ -306,100 +297,54 @@ class BasilicaAggregator:
             if idx.numel() == 0:
                 continue
             
-            # 4. Momentum-based Aggregation (Outer Momentum with NAG)
-            m = self.momentum_buffers[i]
-            
-            # Update momentum: m = beta * m + (1 - beta) * update
+            m = state['momentum_buffers'][i]
             m.view(-1)[idx].mul_(self.beta).add_(val.view(-1)[idx], alpha=1.0 - self.beta)
             
-            # 4.1 LAMB-style Layer-wise Adaptive Scaling
-            # LAMB helps with large-batch/decentralized convergence by normalizing updates
-            if hasattr(self, 'use_lamb') and self.use_lamb:
+            if self.use_lamb:
                 weight_norm = torch.norm(p.data).item()
                 update_norm = torch.norm(m).item()
-                if weight_norm > 0 and update_norm > 0:
-                    trust_ratio = weight_norm / (update_norm + 1e-8)
-                    # Clip trust ratio to prevent instability
-                    trust_ratio = min(max(trust_ratio, 0.1), 10.0)
-                    layer_lr = effective_lr * trust_ratio
-                else:
-                    layer_lr = effective_lr
+                trust_ratio = min(max(weight_norm / (update_norm + 1e-8), 0.1), 10.0) if weight_norm > 0 and update_norm > 0 else 1.0
+                layer_lr = effective_lr * trust_ratio
             else:
                 layer_lr = effective_lr
 
             if self.use_nag:
-                # Nesterov update: p = p - lr * (beta * m + (1 - beta) * update)
                 nag_update = self.beta * m.view(-1)[idx] + (1.0 - self.beta) * val.view(-1)[idx]
                 p.data.view(-1)[idx] -= layer_lr * nag_update
             else:
-                # Standard momentum update: p = p - lr * m
                 p.data.view(-1)[idx] -= layer_lr * m.view(-1)[idx]
             
-        self.global_version += 1
-        self.worker_versions[worker_id] = self.global_version
+        state['global_version'] += 1
+        state['worker_versions'][worker_id] = state['global_version']
         
-        # 4. Lookahead Update: Slow weights update every k steps
         if self.use_lookahead:
-            self.la_counter += 1
-            if self.la_counter >= self.la_steps:
-                self.la_counter = 0
+            state['la_counter'] += 1
+            if state['la_counter'] >= self.la_steps:
+                state['la_counter'] = 0
                 for i, p in enumerate(self.params):
-                    # slow = slow + alpha * (fast - slow)
-                    # Lookahead stabilizes the outer trajectory by interpolating 
-                    # between the fast, asynchronously updated weights and the slow weights.
-                    self.slow_weights[i].add_(p.data - self.slow_weights[i], alpha=self.la_alpha)
-                    p.data.copy_(self.slow_weights[i])
+                    state['slow_weights'][i].add_(p.data - state['slow_weights'][i], alpha=self.la_alpha)
+                    p.data.copy_(state['slow_weights'][i])
 
-        # 4.5 Polyak Averaging: Maintain a running average of weights for smoother convergence
         if self.use_polyak:
             for i, p in enumerate(self.params):
-                # polyak = alpha * polyak + (1 - alpha) * current
-                self.polyak_weights[i].mul_(self.polyak_alpha).add_(p.data, alpha=1.0 - self.polyak_alpha)
+                state['polyak_weights'][i].mul_(self.polyak_alpha).add_(p.data, alpha=1.0 - self.polyak_alpha)
         
-        # 5. Incentive Design: Loyalty Bonus & Heterogeneity Factor
-        # Reward = (Base + LoyaltyBonus) * HeterogeneityFactor
-        # HeterogeneityFactor rewards workers using compression (helping bandwidth)
+        # 5. Incentive Design
         loyalty = self.worker_loyalty.get(worker_id, 0)
-        # Compounding loyalty bonus: 0.1 * log2(1 + loyalty)
         loyalty_bonus = 0.1 * torch.log2(torch.tensor(loyalty + 1.0)).item()
-        
-        # Check if worker is compressed (from verification_data or metadata)
-        # arXiv:2601.02360: Heterogeneity-Aware Rewards
         is_compressed = verification_data.get('is_compressed', False) if verification_data else False
-        hetero_factor = 1.2 if is_compressed else 1.0 # 20% bonus for being bandwidth-efficient
+        hetero_factor = 1.2 if is_compressed else 1.0
         
         reward = (1.0 + loyalty_bonus) * hetero_factor
-        
         self.worker_rewards[worker_id] = self.worker_rewards.get(worker_id, 0.0) + reward
         self.worker_loyalty[worker_id] = loyalty + 1
         
-        # 4. Dynamic Resource Allocation: Aggregator Migration
-        # If the global version is a multiple of 1000, we could propose a new aggregator
-        # based on highest reputation (loyalty + rewards).
-        if self.global_version % 1000 == 0 and self.worker_rewards:
-            top_worker = max(self.worker_rewards, key=self.worker_rewards.get)
-            print(f"ELECTION: Worker {top_worker} is eligible for Aggregator (Citadel) promotion.")
-            # In a real system, this would trigger a migration handshake.
-
         return True
 
-    def slash_worker(self, worker_id: str):
-        """
-        Manually slashes a worker's rewards.
-        """
-        print(f"MANUAL SLASH: Worker {worker_id} slashed by operator.")
-        self.worker_slashes[worker_id] = self.worker_slashes.get(worker_id, 0) + 1
-        # Optionally reduce rewards as well
-        if worker_id in self.worker_rewards:
-            self.worker_rewards[worker_id] = max(0, self.worker_rewards[worker_id] - 10)
-
-    def get_global_weights(self, use_polyak: bool = False) -> List[torch.Tensor]:
-        """
-        Returns the current global model weights.
-        If use_polyak is True, returns the Polyak-averaged weights for smoother convergence.
-        """
+    def get_global_weights(self, task_id: str = "default", use_polyak: bool = False) -> List[torch.Tensor]:
+        state = self._get_task_state(task_id)
         if use_polyak and self.use_polyak:
-            return [w.clone().detach() for w in self.polyak_weights]
+            return [w.clone().detach() for w in state['polyak_weights']]
         return [p.data.clone().detach() for p in self.params]
 
 # Verification Mechanism: Sparse Proof of Training (SPoT)

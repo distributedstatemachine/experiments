@@ -36,6 +36,8 @@ To make decentralized training real on Basilica, we adapt SparseLoCo for its spe
 - [x] Updated all imports in `quentin/` and `quant/` to use the new namespaced structure.
 - [x] Refined `quentin/deploy_citadel.py` and `quentin/run_basilica_experiment.py` to correctly bundle files from their new locations.
 - [x] Fixed `quant/quant_worker.py` and `quant/quant_aggregator.py` to point to the correct research modules in `quentin/`.
+- [x] Implemented explicit task isolation in `BasilicaAggregator` and `HeterogeneousSparseLoCo` to separate research and trading workloads.
+- [x] Optimized convergence with Nesterov Accelerated Gradient (NAG) and Lookahead Aggregation.
 - [x] Implement core SparseLoCo components in `quentin/sparseloco.py`.
 - [x] Implement Asynchronous Aggregator in `quentin/citadel_server.py`.
 - [x] Implement SPoT verification in `quentin/zk_spot.py`.

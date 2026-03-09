@@ -98,18 +98,16 @@ class HeterogeneousSparseLoCo:
                     self.t_perp[name] = torch.zeros_like(module.weight.data)
 
     @torch.no_grad()
-    def get_sparse_update(self) -> dict:
+    def get_sparse_update(self, task_id: str = "default") -> dict:
         """
-        Computes the sparse, quantized pseudo-gradient with Adaptive Quantization (AQ)
-        and optional LAMB-style adaptive rate scaling.
-        Implements Gradient-Informed Sparsity (GIS) to prioritize high-magnitude updates.
-        Also returns layer-wise gradient norms for Gradient-Aware Communication Scheduling (GACS).
+        Computes the sparse, quantized pseudo-gradient with task isolation.
         """
         updates = []
         layer_norms = []
         self.t += 1 if self.use_lamb else 0
         
         for i, p in enumerate(self.params):
+            # ... existing logic ...
             # Pseudo-gradient
             g = self.initial_weights[i] - p.data
             g_norm = torch.norm(g).item()
