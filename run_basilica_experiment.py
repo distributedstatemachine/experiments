@@ -147,7 +147,8 @@ class Worker:
     def train(self):
         print(f"Worker {{WORKER_ID}} starting training loop...")
         criterion = nn.MSELoss()
-        local_opt = torch.optim.SGD(self.model.parameters(), lr=1e-3)
+        # Use a smaller LR for stability in decentralized setting
+        local_opt = torch.optim.SGD(self.model.parameters(), lr=1e-4)
         
         while True:
             # Generate synthetic data for experiment
@@ -161,7 +162,7 @@ class Worker:
             loss.backward()
             local_opt.step()
             
-            if self.version % 100 == 0:
+            if self.version % 10 == 0: # More frequent updates for testing
                 print(f"Step {{self.version}}, Loss: {{loss.item():.4f}}")
                 update = self.optimizer.get_sparse_update()
                 try:
@@ -169,7 +170,7 @@ class Worker:
                     global_weights = self.pull_weights()
                     self.optimizer.synchronize(global_weights)
                     # Reset local optimizer for new weights
-                    local_opt = torch.optim.SGD(self.model.parameters(), lr=1e-3)
+                    local_opt = torch.optim.SGD(self.model.parameters(), lr=1e-4)
                 except Exception as e:
                     print(f"Sync failed: {{e}}")
             

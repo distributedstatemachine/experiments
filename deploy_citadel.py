@@ -19,6 +19,7 @@ def deploy_citadel():
     # Bundle the code
     source_code = f"""
 import os
+import sys
 
 # Write bundled modules to disk
 with open("citadel_server.py", "w") as f:
@@ -46,8 +47,16 @@ if __name__ == "__main__":
         }
     )
     
-    print(f"Citadel live at: {deployment.url}")
-    return deployment.url
+    # Wait for deployment to be ready and get URL
+    print("Waiting for Citadel to be ready...")
+    while True:
+        status = client.get_deployment(deployment.id)
+        if status.url:
+            print(f"Citadel live at: {status.url}")
+            return status.url
+        if status.error:
+            raise Exception(f"Deployment failed: {status.error}")
+        time.sleep(5)
 
 if __name__ == "__main__":
     url = deploy_citadel()

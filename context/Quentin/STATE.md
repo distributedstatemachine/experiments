@@ -44,7 +44,10 @@ To make decentralized training real on Basilica, we adapt SparseLoCo for its spe
 - [x] Implement robust retry logic and error handling for unreliable Basilica nodes.
 - [x] Verify environment setup and dependency management with `uv`.
 - [x] Finalize `citadel_server.py` and `run_basilica_experiment.py` for live deployment.
-- [x] Launch local Citadel aggregator server.
+- [x] Launch Citadel aggregator server on Basilica.
 - [x] Conduct first real experiment on Basilica using `run_basilica_experiment.py`.
+- [x] Migrated codebase to `https://github.com/distributedstatemachine/experiments` via SSH.
+- [x] Automated Citadel deployment with `deploy_citadel.py`.
+- [x] Enabled heterogeneous worker orchestration on Basilica.
 - [ ] Implement a dashboard or logging mechanism to track real-time convergence and worker rewards.
 - [ ] Benchmarking convergence speed vs. communication overhead in the live environment.
