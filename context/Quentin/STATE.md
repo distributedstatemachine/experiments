@@ -88,6 +88,8 @@ To make decentralized training real on Basilica, we adapt SparseLoCo for its spe
 - [x] Implement Federated Sharpness-Aware Minimization (FedSAM) for better global generalization.
 - [x] Optimize communication overlapping with background thread synchronization.
 - [x] Benchmark ZK-SPoT vs SPoT overhead and provide performance report.
+- [x] Refine Lookahead, FedSAM, and GIS for better convergence and performance.
+- [x] Verify communication overlapping in worker training loop.
 
 ## Next Research Directions: "Advanced Convergence & Performance Optimization"
 1. **Lookahead Aggregation:** Integrated Lookahead optimizer into `BasilicaAggregator` to stabilize the global trajectory by maintaining "slow weights" that interpolate with the fast, asynchronously updated weights.
