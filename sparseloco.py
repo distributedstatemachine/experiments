@@ -321,6 +321,8 @@ class BasilicaAggregator:
                 self.la_counter = 0
                 for i, p in enumerate(self.params):
                     # slow = slow + alpha * (fast - slow)
+                    # Lookahead stabilizes the outer trajectory by interpolating 
+                    # between the fast, asynchronously updated weights and the slow weights.
                     self.slow_weights[i].add_(p.data - self.slow_weights[i], alpha=self.la_alpha)
                     p.data.copy_(self.slow_weights[i])
         

@@ -179,3 +179,107 @@ Optimize…)
 Optimize…)
 2026-03-09 18:36:17  ·  exec tool call  updateTodosToolCall(todos=[{'id': 'finalize_and_push', 'content': 'Update STATE.md and push changes to experiments remote', 'status': 'TODO_STATUS_COMPLETED', 'createdAt': '1773066954416', 'updatedAt': '1773066977766', 'dependencies': []}], merge=True)
 2026-03-09 18:36:17  +  exec tool done  updateTodosToolCall(todos=[{'id': 'finalize_and_push', 'content': 'Update STATE.md and push changes to experiments remote', 'status': 'TODO_STATUS_COMPLETED', 'createdAt': '1773066954416', 'updatedAt': '1773066977766', 'dependencies': []}], merge=True)
+2026-03-09 18:36:47  +  exec tool done  shellToolCall(git add . && git commit --trailer "Made-with: Cursor" -m "$(cat <<'EOF'
+Optimize…)
+2026-03-09 18:36:49     [exec] I've implemented the optimized decentralized training plan, focusing on convergence stability and communication
+2026-03-09 18:36:49     [exec] efficiency for heterogeneous environments.
+2026-03-09 18:36:49     [exec] 
+2026-03-09 18:36:49     [exec] ### Key Optimizations Implemented
+2026-03-09 18:36:49     [exec] 
+2026-03-09 18:36:49     [exec] 1.  **Gradient-
+2026-03-09 18:36:49     [exec] Informed Sparsity (GIS)**:
+2026-03-09 18:36:49     [exec]     - Updated `HeterogeneousSparseLoCo` to use a magnitude-weighted selection criteria.
+2026-03-09 18:36:49     [exec]     -
+2026-03-09 18:36:50     [exec] Instead of simple Top-K on pseudo-gradients, it now prioritizes updates that represent significant directional changes by weighting `delta` with the raw gradient magnitude.
+2026-03-09 18:36:50     [exec] 2.  **Federated SAM (FedSAM)**:
+2026-03-09 18:36:50     [exec]     - Enhanced the local training step with an anchored version of Sharpness-Aware Minimization.
+2026-03-09 18:36:50     [exec]     - It scales the perturbation radius ($\rho$) based on
+2026-03-09 18:36:50     [exec] the local model's drift from the global anchor, ensuring that local sharpness optimization doesn't diverge from the global consensus in heterogeneous environments.
+2026-03-09 18:36:50     [exec] 
+2026-03-09 18:36:50     [exec] 3.  **Communication Overlapping (Background Sync)**:
+2026-03-09 18:36:50     [exec]     - Refactored the
+2026-03-09 18:36:51     [exec] training loop in `run_basilica_experiment.py` to use a background thread for pushing updates and pulling weights.
+2026-03-09 18:36:51     [exec]     - This allows workers to continue local computation (training) while waiting for network I/O, effectively hiding communication latency.
+2026-03-09 18:36:51     [exec] 
+2026-03-09 18:36:51     [exec] 4.  **ZK-SPoT Benchmarking
+2026-03-09 18:36:51     [exec] **:
+2026-03-09 18:36:51     [exec]     - Added high-resolution timing to the `ZKSPoTVerifier` to track verification overhead.
+2026-03-09 18:36:51     [exec]     - This provides the metrics needed to balance privacy-preserving verification with aggregator throughput.
+2026-03-09 18:36:51     [exec] 
+2026-03-09 18:36:51     [exec] ### Implementation Details
+2026-03-09 18:36:51     [exec] 
+2026-03-09 18:36:51     [exec] ```python:basilica_training.py
+2026-03-09 18:36:51     [exec] # GIS Implementation in get_sparse_update
+2026-03-09 18:36:51     [exec] g_max = torch.max(torch.abs(g_flat)) + 1e-8
+2026-03-09 18:36:51     [exec] gis_score = torch.abs(flat) * (1.0 + torch.abs(g_flat) / g_max)
+2026-03-09 18:36:51     [exec] _, indices = torch.topk(gis_score, k
+2026-03-09 18:36:52     [exec] , sorted=False)
+2026-03-09 18:36:52     [exec] ```
+2026-03-09 18:36:52     [exec] 
+2026-03-09 18:36:52     [exec] ```python:run_basilica_experiment.py
+2026-03-09 18:36:52     [exec] # Background Sync Thread
+2026-03-09 18:36:52     [exec] def background_sync():
+2026-03-09 18:36:52     [exec]     while True:
+2026-03-09 18:36:52     [exec]         update_task = sync_queue.get()
+2026-03-09 18:36:52     [exec]         # ... push_update and pull_weights ...
+2026-03-09 18:36:52     [exec]         self.
+2026-03-09 18:36:52     [exec] pending_weights = (global_weights, sync_time)
+2026-03-09 18:36:52     [exec] ```
+2026-03-09 18:36:52     [exec] 
+2026-03-09 18:36:52     [exec] I have pushed these changes to the `experiments` remote on the `main` branch.
+2026-03-09 18:36:52     [exec] 
+2026-03-09 18:36:52     [exec] ```bash
+2026-03-09 18:36:52     [exec] git push experiments main:main
+2026-03-09 18:36:52     [exec] ```
+2026-03-09 18:36:52     [exec] 
+2026-03-09 18:36:52     [exec] Progress has been recorded in `context/Quentin/STATE.md`.
+2026-03-09 18:36:52     [exec] I've implemented the optimized decentralized training plan, focusing on convergence stability and communication efficiency for heterogeneous environments.
+2026-03-09 18:36:52     [exec] 
+2026-03-09 18:36:52     [exec] ### Key Optimizations Implemented
+2026-03-09 18:36:52     [exec] 
+2026-03-09 18:36:52     [exec] 1.  **Gradient-Informed Sparsity (GIS)**:
+2026-03-09 18:36:52     [exec]     - Updated `HeterogeneousSparseLoCo` to use a magnitude-weighted selection criteria.
+2026-03-09 18:36:52     [exec]     - Instead of simple Top-K on pseudo-gradients, it now prioritizes updates that represent significant directional changes by weighting `delta` with the raw gradient magnitude.
+2026-03-09 18:36:52     [exec]     
+2026-03-09 18:36:52     [exec] 2.  **Federated SAM (FedSAM)**:
+2026-03-09 18:36:52     [exec]     - Enhanced the local training step with an anchored version of Sharpness-Aware Minimization.
+2026-03-09 18:36:52     [exec]     - It scales the perturbation radius ($\rho$) based on the local model's drift from the global anchor, ensuring that local sharpness optimization doesn't diverge from the global consensus in heterogeneous environments.
+2026-03-09 18:36:52     [exec] 
+2026-03-09 18:36:52     [exec] 3.  **Communication Overlapping (Background Sync)**:
+2026-03-09 18:36:52     [exec]     - Refactored the training loop in `run_basilica_experiment.py` to use a background thread for pushing updates and pulling weights.
+2026-03-09 18:36:52     [exec]     - This allows workers to continue local computation (training) while waiting for network I/O, effectively hiding communication latency.
+2026-03-09 18:36:52     [exec] 
+2026-03-09 18:36:52     [exec] 4.  **ZK-SPoT Benchmarking**:
+2026-03-09 18:36:52     [exec]     - Added high-resolution timing to the `ZKSPoTVerifier` to track verification overhead.
+2026-03-09 18:36:52     [exec]     - This provides the metrics needed to balance privacy-preserving verification with aggregator throughput.
+2026-03-09 18:36:52     [exec] 
+2026-03-09 18:36:52     [exec] ### Implementation Details
+2026-03-09 18:36:52     [exec] 
+2026-03-09 18:36:52     [exec] ```python:basilica_training.py
+2026-03-09 18:36:52     [exec] # GIS Implementation in get_sparse_update
+2026-03-09 18:36:52     [exec] g_max = torch.max(torch.abs(g_flat)) + 1e-8
+2026-03-09 18:36:52     [exec] gis_score = torch.abs(flat) * (1.0 + torch.abs(g_flat) / g_max)
+2026-03-09 18:36:52     [exec] _, indices = torch.topk(gis_score, k, sorted=False)
+2026-03-09 18:36:52     [exec] ```
+2026-03-09 18:36:52     [exec] 
+2026-03-09 18:36:52     [exec] ```python:run_basilica_experiment.py
+2026-03-09 18:36:52     [exec] # Background Sync Thread
+2026-03-09 18:36:52     [exec] def background_sync():
+2026-03-09 18:36:52     [exec]     while True:
+2026-03-09 18:36:52     [exec]         update_task = sync_queue.get()
+2026-03-09 18:36:52     [exec]         # ... push_update and pull_weights ...
+2026-03-09 18:36:52     [exec]         self.pending_weights = (global_weights, sync_time)
+2026-03-09 18:36:52     [exec] ```
+2026-03-09 18:36:52     [exec] 
+2026-03-09 18:36:52     [exec] I have pushed these changes to the `experiments` remote on the `main` branch.
+2026-03-09 18:36:52     [exec] 
+2026-03-09 18:36:52     [exec] ```bash
+2026-03-09 18:36:52     [exec] git push experiments main:main
+2026-03-09 18:36:52     [exec] ```
+2026-03-09 18:36:52     [exec] 
+2026-03-09 18:36:52     [exec] Progress has been recorded in `context/Quentin/STATE.md`.
+2026-03-09 18:36:52  +  exec done  1m 4s  in=63186  out=2869
+2026-03-09 18:36:53  +  exec finished  rc=0  1m 13s
+2026-03-09 18:36:53  +  Rollout saved → /Users/samueldare/Arbos/context/Quentin/20260309_183346/rollout.md (2115 chars)
+2026-03-09 18:36:53  +  Run completed successfully
+2026-03-09 18:36:53     total duration: 3m 6s

@@ -242,7 +242,7 @@ class HeterogeneousSparseLoCo:
         # After global sync, project embeddings back to subspace
         self.handle_embedding_drift()
 
-    def local_step(self, inputs: torch.Tensor, targets: torch.Tensor, lr: float, use_fedsam: bool = True):
+    def local_step(self, inputs: torch.tensor, targets: torch.tensor, lr: float, use_fedsam: bool = True):
         """
         Performs a local training step with SAM (Sharpness-Aware Minimization).
         If use_fedsam is True, it implements Federated SAM which scales the 
@@ -276,6 +276,8 @@ class HeterogeneousSparseLoCo:
             # We use an anchored version where drift is measured from initial_weights (global consensus)
             drift_norm = torch.sqrt(sum([(p.data - self.initial_weights[i]).norm()**2 for i, p in enumerate(self.params)]))
             # Scale rho: larger drift -> smaller rho to anchor the update
+            # This ensures that as we drift from the consensus, we prioritize flatter minima 
+            # that are closer to the global anchor.
             rho = rho / (1.0 + drift_norm)
             
         scale = rho / norm
