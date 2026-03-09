@@ -46,7 +46,8 @@ class BasilicaTrainer:
                             "BASILICA_API_TOKEN": API_KEY,
                             "CITADEL_URL": self.config.get("CITADEL_URL", "http://localhost:8000"),
                             "WORKER_ID": name,
-                            "IS_COMPRESSED": str(is_compressed)
+                            "IS_COMPRESSED": str(is_compressed),
+                            "SPARSE_DENSITY": "0.03" # Initial density
                         }
                     )
                     self.deployments.append(deployment)
@@ -92,14 +93,15 @@ API_KEY = os.getenv("BASILICA_API_TOKEN")
 CITADEL_URL = os.getenv("CITADEL_URL")
 WORKER_ID = os.getenv("WORKER_ID")
 IS_COMPRESSED = os.getenv("IS_COMPRESSED") == "True"
+SPARSE_DENSITY = float(os.getenv("SPARSE_DENSITY", "0.03"))
 
 class Worker:
-    def __init__(self, model_class, is_compressed):
+    def __init__(self, model_class, is_compressed, density):
         self.model = model_class()
         self.optimizer = HeterogeneousSparseLoCo(
             self.model, 
             is_compressed=is_compressed,
-            density=0.03
+            density=density
         )
         self.version = 0
 
@@ -145,12 +147,13 @@ class Worker:
                 time.sleep(wait_time)
 
     def train(self):
-        print(f"Worker {{WORKER_ID}} starting training loop...")
+        print(f"Worker {WORKER_ID} starting training loop...")
         criterion = nn.MSELoss()
         # Use a smaller LR for stability in decentralized setting
         local_opt = torch.optim.SGD(self.model.parameters(), lr=1e-4)
         
         while True:
+            start_time = time.time()
             # Generate synthetic data for experiment
             data = torch.randn(16, 128)
             target = torch.randn(16, 128)
@@ -162,23 +165,32 @@ class Worker:
             loss.backward()
             local_opt.step()
             
+            step_time = time.time() - start_time
+            
             if self.version % 10 == 0: # More frequent updates for testing
-                print(f"Step {{self.version}}, Loss: {{loss.item():.4f}}")
+                print(f"Step {self.version}, Loss: {loss.item():.4f}, Step Time: {step_time:.4f}s")
                 update = self.optimizer.get_sparse_update()
                 try:
+                    sync_start = time.time()
                     self.push_update(update)
                     global_weights = self.pull_weights()
                     self.optimizer.synchronize(global_weights)
+                    sync_time = time.time() - sync_start
+                    print(f"Sync successful in {sync_time:.4f}s | Step Time: {step_time:.4f}s")
+                    
+                    # Dynamic density adjustment based on sync time
+                    self.optimizer.adjust_density(sync_time)
+                    
                     # Reset local optimizer for new weights
                     local_opt = torch.optim.SGD(self.model.parameters(), lr=1e-4)
                 except Exception as e:
-                    print(f"Sync failed: {{e}}")
+                    print(f"Sync failed: {e}")
             
             self.version += 1
 
 if __name__ == "__main__":
     from main_model import GlobalModel
-    worker = Worker(GlobalModel, IS_COMPRESSED)
+    worker = Worker(GlobalModel, IS_COMPRESSED, SPARSE_DENSITY)
     worker.train()
 """
 
@@ -187,19 +199,34 @@ if __name__ == "__main__":
         self.config["CITADEL_URL"] = citadel_url
         
         # 2. Launch workers
-        self.launch_workers(num_workers=2) # Start small
+        self.launch_workers(num_workers=10) # Scaled up to 10+ workers
         
         # 3. Monitor and Aggregate (The Citadel/Aggregator logic)
         print(f"Experiment running with Citadel at {citadel_url}. Monitoring workers...")
+        
+        start_time = time.time()
+        last_version = 0
+        
         while True:
             try:
                 headers = {"Authorization": f"Bearer {API_KEY}"}
                 resp = requests.get(f"{self.config['CITADEL_URL']}/status", headers=headers)
                 if resp.status_code == 200:
-                    print(f"Citadel Status: {resp.json()}")
+                    data = resp.json()
+                    current_version = data['global_version']
+                    elapsed = time.time() - start_time
+                    
+                    # Calculate throughput: updates per second
+                    if elapsed > 0:
+                        throughput = current_version / elapsed
+                        print(f"Citadel Status: Version={current_version}, Throughput={throughput:.2f} updates/s, Active Workers={len(data['active_workers'])}")
+                    
+                    if current_version > last_version:
+                        print(f"New updates detected! Progressing at {throughput:.2f} updates/s")
+                        last_version = current_version
                 else:
                     print(f"Citadel Status Error: {resp.status_code} - {resp.text}")
-                time.sleep(30)
+                time.sleep(10)
             except Exception as e:
                 print(f"Monitoring error: {e}")
                 time.sleep(10)

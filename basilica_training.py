@@ -132,7 +132,19 @@ class HeterogeneousSparseLoCo:
             else:
                 updates.append(None)
                 
-        return {'updates': updates, 'is_compressed': self.is_compressed}
+        return {'updates': updates, 'is_compressed': self.is_compressed, 'density': self.density}
+
+    def adjust_density(self, network_latency: float):
+        """
+        Dynamically adjusts sparsity based on network conditions.
+        If latency is high, we decrease density (increase sparsity) to reduce payload size.
+        """
+        if network_latency > 2.0: # > 2 seconds
+            self.density = max(0.001, self.density * 0.8)
+            print(f"High latency ({network_latency:.2f}s) detected. Reducing density to {self.density:.4f}")
+        elif network_latency < 0.5: # < 0.5 seconds
+            self.density = min(0.1, self.density * 1.1)
+            print(f"Low latency ({network_latency:.2f}s) detected. Increasing density to {self.density:.4f}")
 
     def handle_embedding_drift(self):
         """

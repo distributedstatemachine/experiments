@@ -23,7 +23,7 @@ To make decentralized training real on Basilica, we adapt SparseLoCo for its spe
 1. **Heterogeneous Compression:** Use Subspace Projection (arXiv:2601.02360) for resource-limited or bandwidth-constrained Basilica nodes (The Bourse), while keeping "The Citadel" nodes uncompressed.
 2. **Asynchronous Aggregation:** Basilica nodes (miners) may have varying performance. We use an asynchronous version of SparseLoCo where the "Parameter Server" or "Aggregator" handles stale sparse updates with staleness compensation.
 3. **Verification of Work (SPoT):** Since Basilica miners are self-interested, we use Sparse Proof of Training (SPoT) to verify that the sparse pseudo-gradients are actually computed from the data using deterministic replay.
-4. **Dynamic Topology:** Nodes may join/leave. The algorithm handles a dynamic $R$ (number of replicas) via the asynchronous aggregator.
+4. **Dynamic Topology & Density:** Nodes may join/leave. The algorithm handles a dynamic $R$ (number of replicas) via the asynchronous aggregator. We also implement **Dynamic Density Adjustment** to scale communication overhead based on real-time network latency.
 
 ## Implementation Progress
 - [x] Initial project structure defined.
@@ -49,5 +49,8 @@ To make decentralized training real on Basilica, we adapt SparseLoCo for its spe
 - [x] Migrated codebase to `https://github.com/distributedstatemachine/experiments` via SSH.
 - [x] Automated Citadel deployment with `deploy_citadel.py`.
 - [x] Enabled heterogeneous worker orchestration on Basilica.
-- [ ] Implement a dashboard or logging mechanism to track real-time convergence and worker rewards.
-- [ ] Benchmarking convergence speed vs. communication overhead in the live environment.
+- [x] Implement a dashboard or logging mechanism to track real-time convergence and worker rewards.
+- [x] Benchmarking convergence speed vs. communication overhead in the live environment.
+- [x] Scale experiment to 10+ heterogeneous workers on Basilica.
+- [x] Implement dynamic density adjustment based on network congestion.
+- [ ] Monitor live experiment and analyze convergence metrics from the Citadel dashboard.
