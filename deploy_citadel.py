@@ -29,34 +29,51 @@ with open("sparseloco.py", "w") as f:
 with open("main_model.py", "w") as f:
     f.write({repr(main_model_code)})
 
-# Run the server
-import uvicorn
-from citadel_server import app
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Run the server
+    import uvicorn
+    import os
+    from citadel_server import app
+    if __name__ == "__main__":
+        # Set environment variables manually for the aggregator
+        os.environ["BASILICA_API_TOKEN"] = {repr(API_KEY)}
+        uvicorn.run(app, host="0.0.0.0", port=8000)
 """
 
     print("Deploying Citadel Aggregator to Basilica...")
     deployment = client.deploy(
         name="citadel-aggregator",
         source=source_code,
-        gpu_count=0, # Aggregator doesn't need GPU
+        gpu_count=1, # Aggregator needs at least 1 GPU per Basilica rules
+        gpu_models=["A10G"],
         pip_packages=["torch", "fastapi", "uvicorn", "basilica-sdk"],
-        env_vars={
-            "BASILICA_API_TOKEN": API_KEY
-        }
+        timeout=600 # Explicitly set timeout for client.deploy
     )
     
     # Wait for deployment to be ready and get URL
     print("Waiting for Citadel to be ready...")
+    t0 = time.time()
     while True:
         status = client.get_deployment(deployment.id)
         if status.url:
-            print(f"Citadel live at: {status.url}")
-            return status.url
+            # Check if it's actually responding
+            try:
+                import requests
+                resp = requests.get(f"{status.url}/status", timeout=10)
+                if resp.status_code == 200:
+                    print(f"Citadel live and healthy at: {status.url}")
+                    return status.url
+                else:
+                    print(f"Citadel URL exists but returned {resp.status_code}, waiting...")
+            except Exception as e:
+                print(f"Citadel URL exists but not responding yet ({e}), waiting...")
+        
         if status.error:
             raise Exception(f"Deployment failed: {status.error}")
-        time.sleep(5)
+        
+        if time.time() - t0 > 600: # 10 minutes
+            raise Exception("Citadel deployment timed out after 10 minutes")
+            
+        time.sleep(10)
 
 if __name__ == "__main__":
     url = deploy_citadel()

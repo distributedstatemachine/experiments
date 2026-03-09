@@ -486,12 +486,19 @@ def _recent_context(max_chars: int = 6000) -> str:
 def _build_ask_prompt(question: str) -> str:
     prompt_md = load_prompt()[:2000]
     context = _recent_context()
+    agents = load_agents()
+    agent_summary = ""
+    if agents:
+        agent_summary = "Current agents:\n" + "\n".join(f"- {aid}: {meta.get('delay')}s delay" for aid, meta in agents.items())
+
     return (
-        "You are answering a question about the Arbos agent.\n\n"
+        "You are answering a question about the Arbos agent and its current tasks.\n\n"
         f"System prompt:\n{prompt_md}\n\n"
+        f"{agent_summary}\n\n"
         f"Recent activity:\n{context}\n\n"
         f"User question: {question}\n\n"
         "Answer concisely based on available information. "
+        "If the user is asking about the state of a specific agent or task, look into its GOAL.md, STATE.md, and recent run logs/plans/rollouts. "
         "If you need to check specific files (like scratch/ or history/), do so."
     )
 
@@ -858,6 +865,56 @@ def run_bot():
 
         threading.Thread(target=_run, daemon=True).start()
 
+    # ── /ask — ask a question about the current state ──────────────────
+
+    @bot.message_handler(commands=["ask"])
+    def handle_ask(message):
+        _save_chat_id(message.chat.id)
+        log_chat("user", message.text)
+        question = message.text.replace("/ask", "", 1).strip()
+        if not question:
+            bot.reply_to(message, "Usage: /ask <question about agents/state>")
+            return
+        
+        ask_prompt = _build_ask_prompt(question)
+
+        def _run():
+            # Use execute=True for /ask to allow the agent to read files if needed
+            response = run_agent_streaming(bot, ask_prompt, message.chat.id, execute=True)
+            log_chat("bot", response[:1000])
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    # ── /slash — slash a worker ──────────────────────────────────────────
+
+    @bot.message_handler(commands=["slash"])
+    def handle_slash(message):
+        _save_chat_id(message.chat.id)
+        log_chat("user", message.text)
+        text = message.text.replace("/slash", "", 1).strip()
+        if not text:
+            bot.reply_to(message, "Usage: /slash <worker_id>")
+            return
+        
+        worker_id = text
+        
+        def _run():
+            try:
+                import requests
+                # Citadel server is usually at localhost:8000
+                resp = requests.post("http://localhost:8000/slash", json={"worker_id": worker_id})
+                if resp.status_code == 200:
+                    data = resp.json()
+                    bot.reply_to(message, f"⚠️ Worker `{worker_id}` slashed! Total slashes: {data.get('total_slashes')}")
+                else:
+                    bot.reply_to(message, f"❌ Failed to slash worker `{worker_id}`: {resp.text}")
+            except Exception as e:
+                bot.reply_to(message, f"❌ Error connecting to Citadel: {str(e)}")
+            
+            log_chat("bot", f"Slashing worker: {worker_id}")
+
+        threading.Thread(target=_run, daemon=True).start()
+
     # ── /status — show current state ─────────────────────────────────────
 
     @bot.message_handler(commands=["status"])
@@ -886,6 +943,8 @@ def run_bot():
             "/message <uuid> <text> — send to agent inbox\n"
             "/env KEY=VALUE — set env variable\n"
             "/adapt <desc> — modify code & restart\n"
+            "/slash <worker_id> — slash a worker\n"
+            "/ask <question> — ask about agent state\n"
             "/logs [agent] [N] — tail logs\n"
             "/status [uuid] — overview or deep agent status"
         ))
@@ -955,7 +1014,8 @@ def run_bot():
         ask_prompt = _build_ask_prompt(message.text)
 
         def _run():
-            response = run_agent_streaming(bot, ask_prompt, message.chat.id, execute=False)
+            # Use execute=True for free text questions to allow the agent to read files if needed
+            response = run_agent_streaming(bot, ask_prompt, message.chat.id, execute=True)
             log_chat("bot", response[:1000])
 
         threading.Thread(target=_run, daemon=True).start()

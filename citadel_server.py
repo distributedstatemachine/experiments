@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 import torch
 import torch.nn as nn
 from sparseloco import BasilicaAggregator, SPoTVerifier
+from zk_spot import ZKSPoTVerifier
 from main_model import GlobalModel
 from typing import List, Dict, Any
 import os
@@ -19,12 +20,12 @@ class ConvergenceTracker:
         self.start_time = time.time()
         self.total_updates = 0
 
-    def log_step(self, global_version: int, worker_rewards: Dict[str, int], worker_slashes: Dict[str, int], active_workers: List[str]):
+    def log_step(self, global_version: int, worker_rewards: Dict[str, float], worker_slashes: Dict[str, int], active_workers: List[str]):
         elapsed = time.time() - self.start_time
         entry = {
             "timestamp": elapsed,
             "version": global_version,
-            "rewards": worker_rewards.copy(),
+            "rewards": {k: float(v) for k, v in worker_rewards.items()},
             "slashes": worker_slashes.copy(),
             "num_workers": len(active_workers)
         }
@@ -35,7 +36,14 @@ class ConvergenceTracker:
         print(f"[Citadel Dashboard] T+{elapsed:.1f}s | Version: {global_version} | Workers: {len(active_workers)}")
         for wid, reward in worker_rewards.items():
             slashes = worker_slashes.get(wid, 0)
-            print(f"  - {wid}: Rewards={reward}, Slashes={slashes}")
+            print(f"  - {wid}: Rewards={reward:.2f}, Slashes={slashes}")
+
+app = FastAPI()
+
+model = GlobalModel()
+aggregator = BasilicaAggregator(model, verifier=SPoTVerifier(GlobalModel, density=0.03))
+zk_verifier = ZKSPoTVerifier(GlobalModel, density=0.03)
+tracker = ConvergenceTracker()
 
 @app.get("/metrics")
 async def get_metrics():
@@ -63,12 +71,6 @@ async def get_metrics():
         ]
     }
 
-app = FastAPI()
-
-model = GlobalModel()
-aggregator = BasilicaAggregator(model)
-tracker = ConvergenceTracker()
-
 @app.get("/weights")
 async def get_weights():
     """Returns the current global model weights."""
@@ -80,7 +82,7 @@ async def get_weights():
 async def push_update(update_data: Dict[str, Any]):
     """
     Receives sparse updates from workers.
-    Expects: worker_id, version, bits, indices, scales
+    Expects: worker_id, version, bits, indices, scales, verification_data (optional)
     """
     try:
         # Convert lists back to tensors
@@ -88,13 +90,61 @@ async def push_update(update_data: Dict[str, Any]):
         indices = [torch.tensor(i, dtype=torch.long) for i in update_data['indices']]
         scales = [torch.tensor(s, dtype=torch.float32) for s in update_data['scales']]
         
-        success = aggregator.apply_sparse_update(
-            bits, 
-            indices, 
-            scales, 
-            update_data['worker_id'], 
-            update_data['version']
-        )
+        verification_data = update_data.get('verification_data')
+        zk_proof = update_data.get('zk_proof')
+        
+        if zk_proof:
+            # ZK-SPoT Verification
+            # Reconstruct tensors in zk_proof
+            zk_proof['proof']['sparse_bits'] = [torch.tensor(b, dtype=torch.int8) for b in zk_proof['proof']['sparse_bits']]
+            zk_proof['proof']['sparse_indices'] = [torch.tensor(i, dtype=torch.long) for i in zk_proof['proof']['sparse_indices']]
+            zk_proof['proof']['sparse_scales'] = [torch.tensor(s, dtype=torch.float32) for s in zk_proof['proof']['sparse_scales']]
+            zk_proof['proof']['data_shard'] = (
+                torch.tensor(zk_proof['proof']['data_shard'][0], dtype=torch.float32),
+                torch.tensor(zk_proof['proof']['data_shard'][1], dtype=torch.float32)
+            )
+            zk_proof['public_inputs']['initial_weights'] = [torch.tensor(w, dtype=torch.float32) for w in zk_proof['public_inputs']['initial_weights']]
+            
+            is_valid = zk_verifier.verify_proof(zk_proof['proof'], zk_proof['public_inputs'])
+            if not is_valid:
+                # Log failure and slash
+                aggregator.slash_worker(update_data['worker_id'])
+                raise HTTPException(status_code=403, detail="ZK-SPoT verification failed")
+            
+            # If ZK-SPoT passes, we proceed with the update
+            success = aggregator.apply_sparse_update(
+                zk_proof['proof']['sparse_bits'], 
+                zk_proof['proof']['sparse_indices'], 
+                zk_proof['proof']['sparse_scales'], 
+                update_data['worker_id'], 
+                update_data['version'],
+                verification_data=None # Already verified via ZK
+            )
+        elif verification_data:
+            # Reconstruct tensors in verification_data
+            verification_data['initial_weights'] = [torch.tensor(w) for w in verification_data['initial_weights']]
+            verification_data['data_shard'] = (
+                torch.tensor(verification_data['data_shard'][0]),
+                torch.tensor(verification_data['data_shard'][1])
+            )
+
+            success = aggregator.apply_sparse_update(
+                bits, 
+                indices, 
+                scales, 
+                update_data['worker_id'], 
+                update_data['version'],
+                verification_data=verification_data
+            )
+        else:
+            # Standard update without verification (less reward)
+            success = aggregator.apply_sparse_update(
+                bits, 
+                indices, 
+                scales, 
+                update_data['worker_id'], 
+                update_data['version']
+            )
         
         if not success:
             raise HTTPException(status_code=403, detail="Update rejected by verification/incentive logic")
@@ -110,6 +160,25 @@ async def push_update(update_data: Dict[str, Any]):
         return {"status": "success", "global_version": aggregator.global_version}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/slash")
+async def slash_worker(data: Dict[str, str]):
+    """Slashes a worker manually."""
+    worker_id = data.get("worker_id")
+    if not worker_id:
+        raise HTTPException(status_code=400, detail="worker_id required")
+    
+    aggregator.slash_worker(worker_id)
+    
+    # Log to tracker
+    tracker.log_step(
+        aggregator.global_version,
+        aggregator.worker_rewards,
+        aggregator.worker_slashes,
+        list(aggregator.worker_versions.keys())
+    )
+    
+    return {"status": "success", "worker_id": worker_id, "total_slashes": aggregator.worker_slashes.get(worker_id, 0)}
 
 @app.get("/status")
 async def get_status():

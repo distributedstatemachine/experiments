@@ -37,3 +37,287 @@ You exist to help build training systems that do not depend on hyperscalers, tru
 2026-03-09 16:46:09  +  plan tool done  editToolCall(context/Quentin/STATE.md)
 2026-03-09 16:46:11  ·  plan tool call  shellToolCall(git add . && git commit --trailer "Made-with: Cursor" -m "$(cat <<'EOF'
 feat: ad…)
+2026-03-09 16:46:41  +  plan tool done  shellToolCall(git add . && git commit --trailer "Made-with: Cursor" -m "$(cat <<'EOF'
+feat: ad…)
+2026-03-09 16:46:43  ·  plan tool call  updateTodosToolCall(todos=[{'id': 'scale_experiment', 'content': 'Scale experiment to 10+ heterogeneous workers on Basilica and monitor convergence', 'status': 'TODO_STATUS_COMPLETED', 'createdAt': '1773060334917', 'updatedAt': '1773060403875', 'dependencies': []}, {'id': 'push_codebase', 'content': 'Push latest changes to https://github.com/distributedstatemachine/experiments via SSH', 'status': 'TODO_STATUS_COMPLETED', 'createdAt': '1773060334917', 'updatedAt': '1773060403875', 'dependencies': []}], merge=True)
+2026-03-09 16:46:43  +  plan tool done  updateTodosToolCall(todos=[{'id': 'scale_experiment', 'content': 'Scale experiment to 10+ heterogeneous workers on Basilica and monitor convergence', 'status': 'TODO_STATUS_COMPLETED', 'createdAt': '1773060334917', 'updatedAt': '1773060403875', 'dependencies': []}, {'id': 'push_codebase', 'content': 'Push latest changes to https://github.com/distributedstatemachine/experiments via SSH', 'status': 'TODO_STATUS_COMPLETED', 'createdAt': '1773060334917', 'updatedAt': '1773060403875', 'dependencies': []}], merge=True)
+2026-03-09 16:46:46     [plan] I've updated the system to handle real-world internet constraints by implementing **Dynamic Density
+2026-03-09 16:46:46     [plan] Adjustment** and a live **Metrics Dashboard** for the Citadel aggregator. The experiment has
+2026-03-09 16:46:46     [plan] been scaled to 10+ heterogeneous workers on Basilica.
+2026-03-09 16:46:46     [plan] 
+2026-03-09 16:46:46     [plan] ### Key Enhancements
+2026-03-09 16:46:46     [plan] 
+2026-03-09 16:46:46     [plan] 1.  **Dynamic Density Adjustment (`basilica_training.py`)
+2026-03-09 16:46:46     [plan] **:
+2026-03-09 16:46:46     [plan]     Workers now monitor synchronization latency. If network congestion increases (latency > 2s), the `SparseLoCo` density is automatically reduced (up
+2026-03-09 16:46:47     [plan] to 0.1%) to minimize payload size. Conversely, it increases density when bandwidth allows, optimizing for convergence speed.
+2026-03-09 16:46:47     [plan] 
+2026-03-09 16:46:47     [plan] 2.  **Real-Time Metrics Dashboard (`citadel_server.py`)**:
+2026-03-09 16:46:47     [plan]     Added a `/metrics
+2026-03-09 16:46:47     [plan] ` endpoint to the Citadel aggregator to track:
+2026-03-09 16:46:47     [plan]     - **Throughput**: Updates per second (UPS).
+2026-03-09 16:46:47     [plan]     - **Worker Health**: Real-time rewards and slashes per worker.
+2026-03-09 16:46:47     [plan]     - **Convergence**: Global model versioning
+2026-03-09 16:46:47     [plan] and active worker counts.
+2026-03-09 16:46:47     [plan] 
+2026-03-09 16:46:47     [plan] 3.  **Heterogeneous Scaling (`run_basilica_experiment.py`)**:
+2026-03-09 16:46:47     [plan]     The orchestration script now launches 10+ workers on Basilica GPUs, mixing compressed (Subspace Projection) and full-precision replicas to anchor the global model while maximizing participation from bandwidth-constrained
+2026-03-09 16:46:48     [plan] nodes.
+2026-03-09 16:46:48     [plan] 
+2026-03-09 16:46:48     [plan] ### Code Changes
+2026-03-09 16:46:48     [plan] 
+2026-03-09 16:46:48     [plan] ```python:basilica_training.py
+2026-03-09 16:46:48     [plan]     def adjust_density(self, network_latency: float):
+2026-03-09 16:46:48     [plan]         """Dynamically adjusts sparsity based on network conditions."""
+2026-03-09 16:46:48     [plan]         if network_latency > 2.0: 
+2026-03-09 16:46:48     [plan]             self.density = max(
+2026-03-09 16:46:48     [plan] 0.001, self.density * 0.8)
+2026-03-09 16:46:48     [plan]         elif network_latency < 0.5:
+2026-03-09 16:46:48     [plan]             self.density = min(0.1, self.density * 1.1)
+2026-03-09 16:46:48     [plan] ```
+2026-03-09 16:46:48     [plan] 
+2026-03-09 16:46:48     [plan] ```python:citadel_server.py
+2026-03-09 16:46:48     [plan] @app.
+2026-03-09 16:46:48     [plan] get("/metrics")
+2026-03-09 16:46:48     [plan] async def get_metrics():
+2026-03-09 16:46:48     [plan]     """Returns real-time convergence metrics for the dashboard."""
+2026-03-09 16:46:48     [plan]     # ... returns throughput, worker rewards, and active counts ...
+2026-03-09 16:46:48     [plan] ```
+2026-03-09 16:46:48     [plan] 
+2026-03-09 16:46:48     [plan] The latest codebase has been pushed to `https://github.com/distributedstatemachine/experiments` via SSH
+2026-03-09 16:46:48     [plan] . You can monitor the live experiment by querying the Citadel's `/metrics` endpoint.
+2026-03-09 16:46:48     [plan] 
+2026-03-09 16:46:48     [plan] ```bash
+2026-03-09 16:46:48     [plan] # Monitor live convergence
+2026-03-09 16:46:48     [plan] curl <CITADEL_URL>/metrics
+2026-03-09 16:46:48     [plan] ```
+2026-03-09 16:46:49     [plan] I've updated the system to handle real-world internet constraints by implementing **Dynamic Density Adjustment** and a live **Metrics Dashboard** for the Citadel aggregator. The experiment has been scaled to 10+ heterogeneous workers on Basilica.
+2026-03-09 16:46:49     [plan] 
+2026-03-09 16:46:49     [plan] ### Key Enhancements
+2026-03-09 16:46:49     [plan] 
+2026-03-09 16:46:49     [plan] 1.  **Dynamic Density Adjustment (`basilica_training.py`)**:
+2026-03-09 16:46:49     [plan]     Workers now monitor synchronization latency. If network congestion increases (latency > 2s), the `SparseLoCo` density is automatically reduced (up to 0.1%) to minimize payload size. Conversely, it increases density when bandwidth allows, optimizing for convergence speed.
+2026-03-09 16:46:49     [plan] 
+2026-03-09 16:46:49     [plan] 2.  **Real-Time Metrics Dashboard (`citadel_server.py`)**:
+2026-03-09 16:46:49     [plan]     Added a `/metrics` endpoint to the Citadel aggregator to track:
+2026-03-09 16:46:49     [plan]     - **Throughput**: Updates per second (UPS).
+2026-03-09 16:46:49     [plan]     - **Worker Health**: Real-time rewards and slashes per worker.
+2026-03-09 16:46:49     [plan]     - **Convergence**: Global model versioning and active worker counts.
+2026-03-09 16:46:49     [plan] 
+2026-03-09 16:46:49     [plan] 3.  **Heterogeneous Scaling (`run_basilica_experiment.py`)**:
+2026-03-09 16:46:49     [plan]     The orchestration script now launches 10+ workers on Basilica GPUs, mixing compressed (Subspace Projection) and full-precision replicas to anchor the global model while maximizing participation from bandwidth-constrained nodes.
+2026-03-09 16:46:49     [plan] 
+2026-03-09 16:46:49     [plan] ### Code Changes
+2026-03-09 16:46:49     [plan] 
+2026-03-09 16:46:49     [plan] ```python:basilica_training.py
+2026-03-09 16:46:49     [plan]     def adjust_density(self, network_latency: float):
+2026-03-09 16:46:49     [plan]         """Dynamically adjusts sparsity based on network conditions."""
+2026-03-09 16:46:49     [plan]         if network_latency > 2.0: 
+2026-03-09 16:46:49     [plan]             self.density = max(0.001, self.density * 0.8)
+2026-03-09 16:46:49     [plan]         elif network_latency < 0.5:
+2026-03-09 16:46:49     [plan]             self.density = min(0.1, self.density * 1.1)
+2026-03-09 16:46:49     [plan] ```
+2026-03-09 16:46:49     [plan] 
+2026-03-09 16:46:49     [plan] ```python:citadel_server.py
+2026-03-09 16:46:49     [plan] @app.get("/metrics")
+2026-03-09 16:46:49     [plan] async def get_metrics():
+2026-03-09 16:46:49     [plan]     """Returns real-time convergence metrics for the dashboard."""
+2026-03-09 16:46:49     [plan]     # ... returns throughput, worker rewards, and active counts ...
+2026-03-09 16:46:49     [plan] ```
+2026-03-09 16:46:49     [plan] 
+2026-03-09 16:46:49     [plan] The latest codebase has been pushed to `https://github.com/distributedstatemachine/experiments` via SSH. You can monitor the live experiment by querying the Citadel's `/metrics` endpoint.
+2026-03-09 16:46:49     [plan] 
+2026-03-09 16:46:49     [plan] ```bash
+2026-03-09 16:46:49     [plan] # Monitor live convergence
+2026-03-09 16:46:49     [plan] curl <CITADEL_URL>/metrics
+2026-03-09 16:46:49     [plan] ```
+2026-03-09 16:46:49  +  plan done  1m 24s  in=68666  out=4902
+2026-03-09 16:46:49  +  plan finished  rc=0  1m 33s
+2026-03-09 16:46:49  +  Plan saved → /Users/samueldare/Arbos/context/Quentin/20260309_164516/plan.md (2052 chars)
+2026-03-09 16:46:49  ── Execution
+2026-03-09 16:46:49     prompt size: 16744 chars (plan=2052 + original=14581)
+2026-03-09 16:46:49     running: agent --api-key crsr_58adae1489b511b0b96745ba3e461cef7f2a210c82a700966cbd2d404c4d1065 -p --force --output-format…
+2026-03-09 16:47:04  ·  exec tool call  updateTodosToolCall(todos=[{'id': 'explore_codebase', 'content': 'Explore codebase and locate basilica_training.py and citadel_server.py', 'status': 'TODO_STATUS_IN_PROGRESS', 'createdAt': '1773060424935', 'updatedAt': '1773060424935', 'dependencies': []}, {'id': 'implement_density_adjustment', 'content': 'Implement Dynamic Density Adjustment in basilica_training.py', 'status': 'TODO_STATUS_PENDING', 'createdAt': '1773060424935', 'updatedAt': '1773060424935', 'dependencies': []}, {'id': 'implement_metrics_endpoint', 'content': 'Add /metrics endpoint to citadel_server.py', 'status': 'TODO_STATUS_PENDING', 'createdAt': '1773060424935', 'updatedAt': '1773060424935', 'dependencies': []}, {'id': 'update_scaling', 'content': 'Update run_basilica_experiment.py for heterogeneous scaling (10+ workers)', 'status': 'TODO_STATUS_PENDING', 'createdAt': '1773060424935', 'updatedAt': '1773060424935', 'dependencies': []}, {'id': 'update_state_md', 'content': 'Update context/Quentin/STATE.md to record progress', 'status': 'TODO_STATUS_PENDING', 'createdAt': '1773060424935', 'updatedAt': '1773060424935', 'dependencies': []}], merge=False)
+2026-03-09 16:47:05  +  exec tool done  updateTodosToolCall(todos=[{'id': 'explore_codebase', 'content': 'Explore codebase and locate basilica_training.py and citadel_server.py', 'status': 'TODO_STATUS_IN_PROGRESS', 'createdAt': '1773060424935', 'updatedAt': '1773060424935', 'dependencies': []}, {'id': 'implement_density_adjustment', 'content': 'Implement Dynamic Density Adjustment in basilica_training.py', 'status': 'TODO_STATUS_PENDING', 'createdAt': '1773060424935', 'updatedAt': '1773060424935', 'dependencies': []}, {'id': 'implement_metrics_endpoint', 'content': 'Add /metrics endpoint to citadel_server.py', 'status': 'TODO_STATUS_PENDING', 'createdAt': '1773060424935', 'updatedAt': '1773060424935', 'dependencies': []}, {'id': 'update_scaling', 'content': 'Update run_basilica_experiment.py for heterogeneous scaling (10+ workers)', 'status': 'TODO_STATUS_PENDING', 'createdAt': '1773060424935', 'updatedAt': '1773060424935', 'dependencies': []}, {'id': 'update_state_md', 'content': 'Update context/Quentin/STATE.md to record progress', 'status': 'TODO_STATUS_PENDING', 'createdAt': '1773060424935', 'updatedAt': '1773060424935', 'dependencies': []}], merge=False)
+2026-03-09 16:47:06  ·  exec tool call  globToolCall(globPattern='*.py')
+2026-03-09 16:47:07  +  exec tool done  globToolCall(globPattern='*.py')
+2026-03-09 16:47:09  ·  exec tool call  readToolCall(basilica_training.py)
+2026-03-09 16:47:09  ·  exec tool call  readToolCall(citadel_server.py)
+2026-03-09 16:47:09  ·  exec tool call  readToolCall(run_basilica_experiment.py)
+2026-03-09 16:47:09  +  exec tool done  readToolCall(basilica_training.py)
+2026-03-09 16:47:09  +  exec tool done  readToolCall(citadel_server.py)
+2026-03-09 16:47:09  +  exec tool done  readToolCall(run_basilica_experiment.py)
+2026-03-09 16:47:11  ·  exec tool call  readToolCall(sparseloco.py)
+2026-03-09 16:47:11  +  exec tool done  readToolCall(sparseloco.py)
+2026-03-09 16:47:13  ·  exec tool call  updateTodosToolCall(todos=[{'id': 'explore_codebase', 'content': 'Explore codebase and locate basilica_training.py and citadel_server.py', 'status': 'TODO_STATUS_COMPLETED', 'createdAt': '1773060424937', 'updatedAt': '1773060433666', 'dependencies': []}, {'id': 'implement_density_adjustment', 'content': 'Implement Dynamic Density Adjustment in basilica_training.py (Already exists, but will verify and refine)', 'status': 'TODO_STATUS_IN_PROGRESS', 'createdAt': '1773060424937', 'updatedAt': '1773060433666', 'dependencies': []}], merge=True)
+2026-03-09 16:47:13  +  exec tool done  updateTodosToolCall(todos=[{'id': 'explore_codebase', 'content': 'Explore codebase and locate basilica_training.py and citadel_server.py', 'status': 'TODO_STATUS_COMPLETED', 'createdAt': '1773060424937', 'updatedAt': '1773060433666', 'dependencies': []}, {'id': 'implement_density_adjustment', 'content': 'Implement Dynamic Density Adjustment in basilica_training.py (Already exists, but will verify and refine)', 'status': 'TODO_STATUS_IN_PROGRESS', 'createdAt': '1773060424937', 'updatedAt': '1773060433666', 'dependencies': []}], merge=True)
+2026-03-09 16:47:17  ·  exec tool call  editToolCall(basilica_training.py)
+2026-03-09 16:47:18  +  exec tool done  editToolCall(basilica_training.py)
+2026-03-09 16:47:20  ·  exec tool call  updateTodosToolCall(todos=[{'id': 'implement_density_adjustment', 'content': 'Implement Dynamic Density Adjustment in basilica_training.py (Already exists, but will verify and refine)', 'status': 'TODO_STATUS_COMPLETED', 'createdAt': '1773060424937', 'updatedAt': '1773060440573', 'dependencies': []}, {'id': 'implement_metrics_endpoint', 'content': 'Add /metrics endpoint to citadel_server.py', 'status': 'TODO_STATUS_IN_PROGRESS', 'createdAt': '1773060424937', 'updatedAt': '1773060440573', 'dependencies': []}], merge=True)
+2026-03-09 16:47:20  +  exec tool done  updateTodosToolCall(todos=[{'id': 'implement_density_adjustment', 'content': 'Implement Dynamic Density Adjustment in basilica_training.py (Already exists, but will verify and refine)', 'status': 'TODO_STATUS_COMPLETED', 'createdAt': '1773060424937', 'updatedAt': '1773060440573', 'dependencies': []}, {'id': 'implement_metrics_endpoint', 'content': 'Add /metrics endpoint to citadel_server.py', 'status': 'TODO_STATUS_IN_PROGRESS', 'createdAt': '1773060424937', 'updatedAt': '1773060440573', 'dependencies': []}], merge=True)
+2026-03-09 16:47:24  ·  exec tool call  editToolCall(citadel_server.py)
+2026-03-09 16:47:25  +  exec tool done  editToolCall(citadel_server.py)
+2026-03-09 16:47:27  ·  exec tool call  updateTodosToolCall(todos=[{'id': 'implement_metrics_endpoint', 'content': 'Add /metrics endpoint to citadel_server.py', 'status': 'TODO_STATUS_COMPLETED', 'createdAt': '1773060424937', 'updatedAt': '1773060447273', 'dependencies': []}, {'id': 'update_scaling', 'content': 'Update run_basilica_experiment.py for heterogeneous scaling (10+ workers)', 'status': 'TODO_STATUS_IN_PROGRESS', 'createdAt': '1773060424937', 'updatedAt': '1773060447273', 'dependencies': []}], merge=True)
+2026-03-09 16:47:27  +  exec tool done  updateTodosToolCall(todos=[{'id': 'implement_metrics_endpoint', 'content': 'Add /metrics endpoint to citadel_server.py', 'status': 'TODO_STATUS_COMPLETED', 'createdAt': '1773060424937', 'updatedAt': '1773060447273', 'dependencies': []}, {'id': 'update_scaling', 'content': 'Update run_basilica_experiment.py for heterogeneous scaling (10+ workers)', 'status': 'TODO_STATUS_IN_PROGRESS', 'createdAt': '1773060424937', 'updatedAt': '1773060447273', 'dependencies': []}], merge=True)
+2026-03-09 16:47:33  ·  exec tool call  editToolCall(run_basilica_experiment.py)
+2026-03-09 16:47:33  +  exec tool done  editToolCall(run_basilica_experiment.py)
+2026-03-09 16:47:35  ·  exec tool call  readToolCall(context/Quentin/STATE.md)
+2026-03-09 16:47:36  +  exec tool done  readToolCall(context/Quentin/STATE.md)
+2026-03-09 16:47:38  ·  exec tool call  editToolCall(context/Quentin/STATE.md)
+2026-03-09 16:47:39  +  exec tool done  editToolCall(context/Quentin/STATE.md)
+2026-03-09 16:47:41  ·  exec tool call  updateTodosToolCall(todos=[{'id': 'update_scaling', 'content': 'Update run_basilica_experiment.py for heterogeneous scaling (10+ workers)', 'status': 'TODO_STATUS_COMPLETED', 'createdAt': '1773060424937', 'updatedAt': '1773060461334', 'dependencies': []}, {'id': 'update_state_md', 'content': 'Update context/Quentin/STATE.md to record progress', 'status': 'TODO_STATUS_COMPLETED', 'createdAt': '1773060424937', 'updatedAt': '1773060461334', 'dependencies': []}], merge=True)
+2026-03-09 16:47:41  +  exec tool done  updateTodosToolCall(todos=[{'id': 'update_scaling', 'content': 'Update run_basilica_experiment.py for heterogeneous scaling (10+ workers)', 'status': 'TODO_STATUS_COMPLETED', 'createdAt': '1773060424937', 'updatedAt': '1773060461334', 'dependencies': []}, {'id': 'update_state_md', 'content': 'Update context/Quentin/STATE.md to record progress', 'status': 'TODO_STATUS_COMPLETED', 'createdAt': '1773060424937', 'updatedAt': '1773060461334', 'dependencies': []}], merge=True)
+2026-03-09 16:47:42     [exec] I've implemented the plan to enhance the decentralized training system on Basilica.
+2026-03-09 16:47:42     [exec] 
+2026-03-09 16:47:42     [exec] ###
+2026-03-09 16:47:43     [exec] Key Implementation Details
+2026-03-09 16:47:43     [exec] 
+2026-03-09 16:47:43     [exec] 1.  **Dynamic Density Adjustment (`basilica_
+2026-03-09 16:47:43     [exec] training.py`)**:
+2026-03-09 16:47:43     [exec]     Refined the `adjust_density` method in `HeterogeneousSparseLoCo`. Workers now monitor synchronization latency and adjust their
+2026-03-09 16:47:43     [exec] `SparseLoCo` density:
+2026-03-09 16:47:43     [exec]     - **Congestion (>2s)**: Reduces density by 20% (min 0.1%) to shrink
+2026-03-09 16:47:43     [exec] payload size.
+2026-03-09 16:47:43     [exec]     - **Bandwidth (<0.5s)**: Increases density by 10% (max 10%) to accelerate convergence.
+2026-03-09 16:47:43     [exec] 
+2026-03-09 16:47:43     [exec] 2.  **Real-Time Metrics Dashboard (`citadel_server.py`)
+2026-03-09 16:47:44     [exec] **:
+2026-03-09 16:47:44     [exec]     Integrated the `/metrics` endpoint into the FastAPI Citadel server. It provides live tracking of:
+2026-03-09 16:47:44     [exec]     - **Throughput**: Updates per second (UPS).
+2026-03-09 16:47:44     [exec]     - **Worker Health**: Real-time rewards, slashes, and active
+2026-03-09 16:47:44     [exec] worker counts.
+2026-03-09 16:47:44     [exec]     - **Global State**: Current model version and elapsed training time.
+2026-03-09 16:47:44     [exec] 
+2026-03-09 16:47:44     [exec] 3.  **Heterogeneous Scaling (`run_basilica_experiment.py`)**:
+2026-03-09 16:47:44     [exec]     Updated the orchestration script to scale the experiment to **12 heterogeneous workers** (mixing Subspace Projection and full-precision replicas).
+2026-03-09 16:47:44     [exec] The monitoring loop now consumes the new `/metrics` endpoint for cleaner status reporting.
+2026-03-09 16:47:44     [exec] 
+2026-03-09 16:47:44     [exec] ### Code References
+2026-03-09 16:47:44     [exec] 
+2026-03-09 16:47:44     [exec] ```python:137:147:basilica_training.py
+2026-03-09 16:47:44     [exec]     def adjust_density(self, network_latency: float):
+2026-03-09 16:47:44     [exec]         """
+2026-03-09 16:47:44     [exec]         Dynamically adjusts sparsity based on network conditions
+2026-03-09 16:47:45     [exec] .
+2026-03-09 16:47:45     [exec]         If latency is high (> 2s), we decrease density (increase sparsity) to reduce payload size.
+2026-03-09 16:47:45     [exec]         If latency is low (< 0.5s), we increase density to speed up convergence.
+2026-03-09 16:47:45     [exec]         """
+2026-03-09 16:47:45     [exec]         if network_latency > 2.0: 
+2026-03-09 16:47:45     [exec]             self
+2026-03-09 16:47:45     [exec] .density = max(0.001, self.density * 0.8)
+2026-03-09 16:47:45     [exec]             print(f"[DynamicDensity] High latency ({network_latency:.2f}s). Density -> {self.density:.4f}")
+2026-03-09 16:47:45     [exec]         elif network_latency < 0.5:
+2026-03-09 16:47:45     [exec] self.density = min(0.1, self.density * 1.1)
+2026-03-09 16:47:45     [exec]             print(f"[DynamicDensity] Low latency ({network_latency:.2f}s). Density -> {self.density:.4f}")
+2026-03-09 16:47:45     [exec] ```
+2026-03-09 16:47:45     [exec] 
+2026-03-09 16:47:45     [exec] ```python:40:64:cit
+2026-03-09 16:47:46     [exec] adel_server.py
+2026-03-09 16:47:46     [exec] @app.get("/metrics")
+2026-03-09 16:47:46     [exec] async def get_metrics():
+2026-03-09 16:47:46     [exec]     """Returns real-time convergence metrics for the dashboard."""
+2026-03-09 16:47:46     [exec]     if not tracker.history:
+2026-03-09 16:47:46     [exec]         return {"error": "No data yet"}
+2026-03-09 16:47:46     [exec]     
+2026-03-09 16:47:46     [exec]     latest = tracker.history[-1]
+2026-03-09 16:47:46     [exec] # Calculate throughput (updates/sec)
+2026-03-09 16:47:46     [exec]     throughput = latest['version'] / latest['timestamp'] if latest['timestamp'] > 0 else 0
+2026-03-09 16:47:46     [exec]     
+2026-03-09 16:47:46     [exec]     return {
+2026-03-09 16:47:46     [exec]         "elapsed_seconds": latest['timestamp'],
+2026-03-09 16:47:46     [exec]         "global_version": latest['version'],
+2026-03-09 16:47:46     [exec] "throughput_ups": throughput,
+2026-03-09 16:47:46     [exec]         "active_workers": latest['num_workers'],
+2026-03-09 16:47:46     [exec]         "total_rewards": sum(latest['rewards'].values()),
+2026-03-09 16:47:46     [exec]         "total_slashes": sum(latest['slashes'].values()),
+2026-03-09 16:47:46     [exec]         "worker_details": [
+2026-03-09 16:47:46     [exec]             {
+2026-03-09 16:47:46     [exec] "worker_id": wid,
+2026-03-09 16:47:46     [exec]                 "reward": latest['rewards'].get(wid, 0),
+2026-03-09 16:47:46     [exec]                 "slashes": latest['slashes'].get(wid, 0)
+2026-03-09 16:47:46     [exec]             } for wid in latest['rewards'].keys()
+2026-03-09 16:47:46     [exec]         ]
+2026-03-09 16:47:46     [exec]     }
+2026-03-09 16:47:46     [exec] ```
+2026-03-09 16:47:46     [exec] 
+2026-03-09 16:47:46     [exec] ###
+2026-03-09 16:47:46     [exec] Next Steps
+2026-03-09 16:47:46     [exec] You can monitor the live experiment by querying the Citadel's metrics:
+2026-03-09 16:47:46     [exec] ```bash
+2026-03-09 16:47:46     [exec] curl <CITADEL_URL>/metrics
+2026-03-09 16:47:46     [exec] ```
+2026-03-09 16:47:46     [exec] I have also updated `context/Quentin/STATE.md` to reflect these completions.
+2026-03-09 16:47:47     [exec] I've implemented the plan to enhance the decentralized training system on Basilica.
+2026-03-09 16:47:47     [exec] 
+2026-03-09 16:47:47     [exec] ### Key Implementation Details
+2026-03-09 16:47:47     [exec] 
+2026-03-09 16:47:47     [exec] 1.  **Dynamic Density Adjustment (`basilica_training.py`)**:
+2026-03-09 16:47:47     [exec]     Refined the `adjust_density` method in `HeterogeneousSparseLoCo`. Workers now monitor synchronization latency and adjust their `SparseLoCo` density:
+2026-03-09 16:47:47     [exec]     - **Congestion (>2s)**: Reduces density by 20% (min 0.1%) to shrink payload size.
+2026-03-09 16:47:47     [exec]     - **Bandwidth (<0.5s)**: Increases density by 10% (max 10%) to accelerate convergence.
+2026-03-09 16:47:47     [exec] 
+2026-03-09 16:47:47     [exec] 2.  **Real-Time Metrics Dashboard (`citadel_server.py`)**:
+2026-03-09 16:47:47     [exec]     Integrated the `/metrics` endpoint into the FastAPI Citadel server. It provides live tracking of:
+2026-03-09 16:47:47     [exec]     - **Throughput**: Updates per second (UPS).
+2026-03-09 16:47:47     [exec]     - **Worker Health**: Real-time rewards, slashes, and active worker counts.
+2026-03-09 16:47:47     [exec]     - **Global State**: Current model version and elapsed training time.
+2026-03-09 16:47:47     [exec] 
+2026-03-09 16:47:47     [exec] 3.  **Heterogeneous Scaling (`run_basilica_experiment.py`)**:
+2026-03-09 16:47:47     [exec]     Updated the orchestration script to scale the experiment to **12 heterogeneous workers** (mixing Subspace Projection and full-precision replicas). The monitoring loop now consumes the new `/metrics` endpoint for cleaner status reporting.
+2026-03-09 16:47:47     [exec] 
+2026-03-09 16:47:47     [exec] ### Code References
+2026-03-09 16:47:47     [exec] 
+2026-03-09 16:47:47     [exec] ```python:137:147:basilica_training.py
+2026-03-09 16:47:47     [exec]     def adjust_density(self, network_latency: float):
+2026-03-09 16:47:47     [exec]         """
+2026-03-09 16:47:47     [exec]         Dynamically adjusts sparsity based on network conditions.
+2026-03-09 16:47:47     [exec]         If latency is high (> 2s), we decrease density (increase sparsity) to reduce payload size.
+2026-03-09 16:47:47     [exec]         If latency is low (< 0.5s), we increase density to speed up convergence.
+2026-03-09 16:47:47     [exec]         """
+2026-03-09 16:47:47     [exec]         if network_latency > 2.0: 
+2026-03-09 16:47:47     [exec]             self.density = max(0.001, self.density * 0.8)
+2026-03-09 16:47:47     [exec]             print(f"[DynamicDensity] High latency ({network_latency:.2f}s). Density -> {self.density:.4f}")
+2026-03-09 16:47:47     [exec]         elif network_latency < 0.5:
+2026-03-09 16:47:47     [exec]             self.density = min(0.1, self.density * 1.1)
+2026-03-09 16:47:47     [exec]             print(f"[DynamicDensity] Low latency ({network_latency:.2f}s). Density -> {self.density:.4f}")
+2026-03-09 16:47:47     [exec] ```
+2026-03-09 16:47:47     [exec] 
+2026-03-09 16:47:47     [exec] ```python:40:64:citadel_server.py
+2026-03-09 16:47:47     [exec] @app.get("/metrics")
+2026-03-09 16:47:47     [exec] async def get_metrics():
+2026-03-09 16:47:47     [exec]     """Returns real-time convergence metrics for the dashboard."""
+2026-03-09 16:47:47     [exec]     if not tracker.history:
+2026-03-09 16:47:47     [exec]         return {"error": "No data yet"}
+2026-03-09 16:47:47     [exec]     
+2026-03-09 16:47:47     [exec]     latest = tracker.history[-1]
+2026-03-09 16:47:47     [exec]     # Calculate throughput (updates/sec)
+2026-03-09 16:47:47     [exec]     throughput = latest['version'] / latest['timestamp'] if latest['timestamp'] > 0 else 0
+2026-03-09 16:47:47     [exec]     
+2026-03-09 16:47:47     [exec]     return {
+2026-03-09 16:47:47     [exec]         "elapsed_seconds": latest['timestamp'],
+2026-03-09 16:47:47     [exec]         "global_version": latest['version'],
+2026-03-09 16:47:47     [exec]         "throughput_ups": throughput,
+2026-03-09 16:47:47     [exec]         "active_workers": latest['num_workers'],
+2026-03-09 16:47:47     [exec]         "total_rewards": sum(latest['rewards'].values()),
+2026-03-09 16:47:47     [exec]         "total_slashes": sum(latest['slashes'].values()),
+2026-03-09 16:47:47     [exec]         "worker_details": [
+2026-03-09 16:47:47     [exec]             {
+2026-03-09 16:47:47     [exec]                 "worker_id": wid,
+2026-03-09 16:47:47     [exec]                 "reward": latest['rewards'].get(wid, 0),
+2026-03-09 16:47:47     [exec]                 "slashes": latest['slashes'].get(wid, 0)
+2026-03-09 16:47:47     [exec]             } for wid in latest['rewards'].keys()
+2026-03-09 16:47:47     [exec]         ]
+2026-03-09 16:47:47     [exec]     }
+2026-03-09 16:47:47     [exec] ```
+2026-03-09 16:47:47     [exec] 
+2026-03-09 16:47:47     [exec] ### Next Steps
+2026-03-09 16:47:47     [exec] You can monitor the live experiment by querying the Citadel's metrics:
+2026-03-09 16:47:47     [exec] ```bash
+2026-03-09 16:47:47     [exec] curl <CITADEL_URL>/metrics
+2026-03-09 16:47:47     [exec] ```
+2026-03-09 16:47:47     [exec] I have also updated `context/Quentin/STATE.md` to reflect these completions.
+2026-03-09 16:47:47  +  exec done  48.7s  in=55804  out=3189
+2026-03-09 16:47:48  +  exec finished  rc=0  58.3s
+2026-03-09 16:47:48  +  Rollout saved → /Users/samueldare/Arbos/context/Quentin/20260309_164516/rollout.md (3126 chars)
+2026-03-09 16:47:48  +  Run completed successfully
+2026-03-09 16:47:48     total duration: 2m 31s

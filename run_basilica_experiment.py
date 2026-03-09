@@ -30,7 +30,7 @@ class BasilicaTrainer:
             
             print(f"Deploying {name} to Basilica...")
             
-            worker_code = self._generate_worker_code(is_compressed)
+            worker_code = self._generate_worker_code(is_compressed, name)
             
             # Use Basilica SDK to deploy
             max_retries = 3
@@ -42,13 +42,7 @@ class BasilicaTrainer:
                         gpu_count=1,
                         gpu_models=["A10G"],
                         pip_packages=["torch", "numpy", "basilica-sdk", "requests", "uv"],
-                        env_vars={
-                            "BASILICA_API_TOKEN": API_KEY,
-                            "CITADEL_URL": self.config.get("CITADEL_URL", "http://localhost:8000"),
-                            "WORKER_ID": name,
-                            "IS_COMPRESSED": str(is_compressed),
-                            "SPARSE_DENSITY": "0.03" # Initial density
-                        }
+                        timeout=600 # Increased timeout for worker deployment
                     )
                     self.deployments.append(deployment)
                     print(f"Worker {i} live at: {deployment.url}")
@@ -60,7 +54,7 @@ class BasilicaTrainer:
                     else:
                         time.sleep(5)
 
-    def _generate_worker_code(self, is_compressed: bool):
+    def _generate_worker_code(self, is_compressed: bool, name: str):
         # Read the required files to bundle them
         with open("basilica_training.py", "r") as f:
             basilica_training_code = f.read()
@@ -68,22 +62,32 @@ class BasilicaTrainer:
             sparseloco_code = f.read()
         with open("main_model.py", "r") as f:
             main_model_code = f.read()
+        with open("zk_spot.py", "r") as f:
+            zk_spot_code = f.read()
 
         return f"""
 import os
 import sys
 
-# Write bundled modules to disk so they can be imported
+# Set environment variables manually for the worker
+os.environ["BASILICA_API_TOKEN"] = {repr(API_KEY)}
+os.environ["CITADEL_URL"] = {repr(self.config.get("CITADEL_URL"))}
+os.environ["WORKER_ID"] = {repr(name)}
+os.environ["IS_COMPRESSED"] = {repr(str(is_compressed))}
+os.environ["SPARSE_DENSITY"] = "0.03"
 with open("basilica_training.py", "w") as f:
     f.write({repr(basilica_training_code)})
 with open("sparseloco.py", "w") as f:
     f.write({repr(sparseloco_code)})
 with open("main_model.py", "w") as f:
     f.write({repr(main_model_code)})
+with open("zk_spot.py", "w") as f:
+    f.write({repr(zk_spot_code)})
 
 import torch
 import torch.nn as nn
 from basilica_training import HeterogeneousSparseLoCo
+from zk_spot import PrivacyAwareWorker
 import requests
 import json
 import time
@@ -104,16 +108,50 @@ class Worker:
             density=density
         )
         self.version = 0
+        # Initialize PrivacyAwareWorker for ZK-SPoT
+        # In a real scenario, data_shard would be real data
+        self.privacy_worker = PrivacyAwareWorker(
+            WORKER_ID, 
+            model_class, 
+            (torch.randn(16, 128), torch.randn(16, 128)) 
+        )
 
-    def push_update(self, update):
+    def push_update(self, update, verification_data=None, zk_proof=None):
         # Convert tensors to lists for JSON
-        serializable_update = {{
+        serializable_update = {
             "worker_id": WORKER_ID,
             "version": self.version,
             "bits": [u['bits'].tolist() if u else [] for u in update['updates']],
             "indices": [u['indices'].tolist() if u else [] for u in update['updates']],
-            "scales": [u['scale'].item() if u else 0.0 for u in update['updates']]
-        }}
+            "scales": [u['scale'].tolist() if u else [0.0, 0.0] for u in update['updates']]
+        }
+
+        if zk_proof:
+            # Serialize ZK proof
+            serializable_update["zk_proof"] = {
+                "proof": {
+                    "commitment": zk_proof['proof']['commitment'],
+                    "sparse_bits": [b.tolist() for b in zk_proof['proof']['sparse_bits']],
+                    "sparse_indices": [i.tolist() for i in zk_proof['proof']['sparse_indices']],
+                    "sparse_scales": [s.tolist() for s in zk_proof['proof']['sparse_scales']],
+                    "data_shard": [zk_proof['proof']['data_shard'][0].tolist(), zk_proof['proof']['data_shard'][1].tolist()]
+                },
+                "public_inputs": {
+                    "initial_weights": [w.tolist() for w in zk_proof['public_inputs']['initial_weights']],
+                    "data_hash": zk_proof['public_inputs']['data_hash'],
+                    "h_steps": zk_proof['public_inputs']['h_steps'],
+                    "lr": zk_proof['public_inputs']['lr'],
+                    "seed": zk_proof['public_inputs']['seed']
+                }
+            }
+        elif verification_data:
+            serializable_update["verification_data"] = {
+                "initial_weights": [w.tolist() for w in verification_data['initial_weights']],
+                "data_shard": [verification_data['data_shard'][0].tolist(), verification_data['data_shard'][1].tolist()],
+                "h_steps": verification_data['h_steps'],
+                "lr": verification_data['lr'],
+                "seed": verification_data['seed']
+            }
         
         max_retries = 10
         for attempt in range(max_retries):
@@ -150,41 +188,83 @@ class Worker:
         print(f"Worker {WORKER_ID} starting training loop...")
         criterion = nn.MSELoss()
         # Use a smaller LR for stability in decentralized setting
-        local_opt = torch.optim.SGD(self.model.parameters(), lr=1e-4)
+        local_lr = 1e-4
         
+        import threading
+        import queue
+
+        # Queue for background synchronization
+        sync_queue = queue.Queue(maxsize=1)
+        
+        def background_sync():
+            while True:
+                update_task = sync_queue.get()
+                if update_task is None: break
+                
+                update, zk_proof = update_task
+                try:
+                    sync_start = time.time()
+                    self.push_update(update, zk_proof=zk_proof)
+                    global_weights = self.pull_weights()
+                    sync_time = time.time() - sync_start
+                    
+                    # We can't apply weights directly here as it might interfere with training
+                    # Instead, we store them for the main thread to pick up
+                    self.pending_weights = (global_weights, sync_time)
+                    print(f"[BackgroundSync] Completed in {sync_time:.4f}s")
+                except Exception as e:
+                    print(f"[BackgroundSync] Failed: {e}")
+                finally:
+                    sync_queue.task_done()
+
+        self.pending_weights = None
+        sync_thread = threading.Thread(target=background_sync, daemon=True)
+        sync_thread.start()
+
         while True:
             start_time = time.time()
             # Generate synthetic data for experiment
             data = torch.randn(16, 128)
             target = torch.randn(16, 128)
             
+            # Check for pending weights from background sync
+            if self.pending_weights:
+                weights, sync_time = self.pending_weights
+                self.optimizer.synchronize(weights, network_latency=sync_time)
+                self.pending_weights = None
+                print(f"Applied background weights | Version: {self.version}")
+
+            # For SPoT, we need to capture the state before local steps
+            initial_weights = [p.data.clone().detach() for p in self.model.parameters()]
+            seed = int(time.time() * 1000) % 100000
+            torch.manual_seed(seed)
+
             self.model.train()
-            local_opt.zero_grad()
-            output = self.model(data)
-            loss = criterion(output, target)
-            loss.backward()
-            local_opt.step()
+            # Use local_step which implements SAM
+            loss = self.optimizer.local_step(data, target, local_lr)
             
             step_time = time.time() - start_time
             
             if self.version % 10 == 0: # More frequent updates for testing
-                print(f"Step {self.version}, Loss: {loss.item():.4f}, Step Time: {step_time:.4f}s")
+                print(f"Step {self.version}, Loss: {loss:.4f}, Step Time: {step_time:.4f}s")
                 update = self.optimizer.get_sparse_update()
+                
+                # Generate ZK-SPoT proof (Privacy-Preserving)
+                zk_proof = self.privacy_worker.generate_proof(
+                    initial_weights,
+                    [u['bits'] if u else torch.tensor([], dtype=torch.int8) for u in update['updates']],
+                    [u['indices'] if u else torch.tensor([], dtype=torch.long) for u in update['updates']],
+                    [u['scale'] if u else torch.tensor([0.0, 0.0], dtype=torch.float32) for u in update['updates']],
+                    h_steps=1,
+                    lr=local_lr,
+                    seed=seed
+                )
+
+                # Try to put in sync queue, if full, we skip (still training)
                 try:
-                    sync_start = time.time()
-                    self.push_update(update)
-                    global_weights = self.pull_weights()
-                    self.optimizer.synchronize(global_weights)
-                    sync_time = time.time() - sync_start
-                    print(f"Sync successful in {sync_time:.4f}s | Step Time: {step_time:.4f}s")
-                    
-                    # Dynamic density adjustment based on sync time
-                    self.optimizer.adjust_density(sync_time)
-                    
-                    # Reset local optimizer for new weights
-                    local_opt = torch.optim.SGD(self.model.parameters(), lr=1e-4)
-                except Exception as e:
-                    print(f"Sync failed: {e}")
+                    sync_queue.put_nowait((update, zk_proof))
+                except queue.Full:
+                    print("Sync queue full, skipping this update to maintain compute throughput.")
             
             self.version += 1
 
@@ -199,7 +279,7 @@ if __name__ == "__main__":
         self.config["CITADEL_URL"] = citadel_url
         
         # 2. Launch workers
-        self.launch_workers(num_workers=10) # Scaled up to 10+ workers
+        self.launch_workers(num_workers=12) # Scaled to 12 heterogeneous workers
         
         # 3. Monitor and Aggregate (The Citadel/Aggregator logic)
         print(f"Experiment running with Citadel at {citadel_url}. Monitoring workers...")
@@ -209,23 +289,22 @@ if __name__ == "__main__":
         
         while True:
             try:
-                headers = {"Authorization": f"Bearer {API_KEY}"}
-                resp = requests.get(f"{self.config['CITADEL_URL']}/status", headers=headers)
+                # Query the new /metrics endpoint
+                resp = requests.get(f"{self.config['CITADEL_URL']}/metrics", timeout=10)
                 if resp.status_code == 200:
                     data = resp.json()
-                    current_version = data['global_version']
-                    elapsed = time.time() - start_time
-                    
-                    # Calculate throughput: updates per second
-                    if elapsed > 0:
-                        throughput = current_version / elapsed
-                        print(f"Citadel Status: Version={current_version}, Throughput={throughput:.2f} updates/s, Active Workers={len(data['active_workers'])}")
-                    
-                    if current_version > last_version:
-                        print(f"New updates detected! Progressing at {throughput:.2f} updates/s")
-                        last_version = current_version
+                    if "error" in data:
+                        print(f"Waiting for data from Citadel...")
+                    else:
+                        current_version = data['global_version']
+                        throughput = data['throughput_ups']
+                        active = data['active_workers']
+                        print(f"[Monitor] Version: {current_version} | UPS: {throughput:.2f} | Workers: {active}")
+                        
+                        if current_version > last_version:
+                            last_version = current_version
                 else:
-                    print(f"Citadel Status Error: {resp.status_code} - {resp.text}")
+                    print(f"Citadel Metrics Error: {resp.status_code}")
                 time.sleep(10)
             except Exception as e:
                 print(f"Monitoring error: {e}")
